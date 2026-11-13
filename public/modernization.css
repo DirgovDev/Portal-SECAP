@@ -1,0 +1,66 @@
+/* Solicitações de modernização: detalhe, histórico e contadores. */
+.mod-detail h3 {
+  margin: 22px 0 8px;
+  font-size: 0.95rem;
+  color: var(--gyn-navy, #002f47);
+}
+.mod-detail > h3:first-of-type {
+  margin-top: 6px;
+  font-size: 1.1rem;
+}
+.mod-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.mod-dl dt {
+  color: var(--gyn-ink-secondary, #58595b);
+  font-size: 0.8rem;
+}
+.mod-dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.mod-text {
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--gyn-line, #d8dede);
+  border-radius: 8px;
+  background: var(--gyn-surface, #f2f4f4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mod-history {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--gyn-line, #d8dede);
+}
+.mod-history li {
+  position: relative;
+  padding: 0 0 14px 12px;
+}
+.mod-history li::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gyn-orange, #f37021);
+}
+.mod-history small {
+  display: block;
+}
+.mod-history p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#modNewForm .field small {
+  display: block;
+  margin-top: 4px;
+}

@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS account_requests (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  salt TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  job_title TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'Pendente'
+);

@@ -1,0 +1,500 @@
+[
+  {
+    "id": "codigo",
+    "name": "ID",
+    "type": "text",
+    "group": "Essenciais",
+    "sourceLabel": "ID",
+    "help": "Origem de referência: PIPELINE, coluna A."
+  },
+  {
+    "id": "orgao",
+    "name": "Órgão responsável",
+    "type": "text",
+    "group": "Essenciais",
+    "sourceLabel": "Orgão",
+    "help": "Origem de referência: PIPELINE, coluna B.",
+    "required": true
+  },
+  {
+    "id": "nome",
+    "name": "Nome da obra ou iniciativa",
+    "type": "text",
+    "group": "Essenciais",
+    "sourceLabel": "Nome do Projeto",
+    "help": "Origem de referência: PIPELINE, coluna C.",
+    "required": true
+  },
+  {
+    "id": "tipo",
+    "name": "Tipo de Projeto",
+    "type": "select",
+    "group": "Essenciais",
+    "sourceLabel": "Tipo de Projeto",
+    "help": "Origem de referência: PIPELINE, coluna D.",
+    "options": [
+      "Obra de infraestrutura",
+      "Obra civil",
+      "Reforma",
+      "Serviço",
+      "Estudo ou projeto",
+      "Outro"
+    ]
+  },
+  {
+    "id": "sei",
+    "name": "SEI",
+    "type": "text",
+    "group": "Acompanhamento",
+    "sourceLabel": "SEI",
+    "help": "Origem de referência: PIPELINE, coluna E."
+  },
+  {
+    "id": "observacao",
+    "name": "Observação",
+    "type": "long",
+    "group": "Acompanhamento",
+    "sourceLabel": "Observação",
+    "help": "Origem de referência: PIPELINE, coluna F."
+  },
+  {
+    "id": "etapa",
+    "name": "Macroetapa",
+    "type": "select",
+    "group": "Essenciais",
+    "sourceLabel": "Macroetapa",
+    "help": "Origem de referência: PIPELINE, coluna G.",
+    "options": [
+      "Em estruturação",
+      "Planejamento",
+      "Preparatório para contratação",
+      "Contratação",
+      "Mobilização",
+      "Execução",
+      "Encerramento"
+    ]
+  },
+  {
+    "id": "detalhamento",
+    "name": "Detalhamento Tipo de Projeto",
+    "type": "text",
+    "group": "Localização",
+    "sourceLabel": "Detalhamento Tipo de Projeto",
+    "help": "Origem de referência: PIPELINE, coluna H."
+  },
+  {
+    "id": "regiao",
+    "name": "Região",
+    "type": "select",
+    "group": "Localização",
+    "sourceLabel": "Região",
+    "help": "Origem de referência: PIPELINE, coluna I.",
+    "options": [
+      "Centro",
+      "Leste",
+      "Noroeste",
+      "Norte",
+      "Oeste",
+      "Sudoeste",
+      "Sul",
+      "Várias / não definida"
+    ]
+  },
+  {
+    "id": "bairro",
+    "name": "Bairro",
+    "type": "text",
+    "group": "Localização",
+    "sourceLabel": "Bairro",
+    "help": "Origem de referência: PIPELINE, coluna J."
+  },
+  {
+    "id": "id_bairro",
+    "name": "Id Bairro",
+    "type": "text",
+    "group": "Localização",
+    "sourceLabel": "Id Bairro",
+    "help": "Origem de referência: PIPELINE, coluna K."
+  },
+  {
+    "id": "corredor",
+    "name": "Corredor",
+    "type": "text",
+    "group": "Localização",
+    "sourceLabel": "Corredor",
+    "help": "Origem de referência: PIPELINE, coluna L."
+  },
+  {
+    "id": "origem_valor",
+    "name": "Origem do Valor",
+    "type": "text",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Origem do Valor",
+    "help": "Origem de referência: PIPELINE, coluna M."
+  },
+  {
+    "id": "tem_projeto",
+    "name": "Tem projeto",
+    "type": "select",
+    "group": "Acompanhamento",
+    "sourceLabel": "Tem projeto",
+    "help": "Origem de referência: PIPELINE, coluna N.",
+    "options": [
+      "Sim",
+      "Não",
+      "Em elaboração"
+    ]
+  },
+  {
+    "id": "valor_projeto",
+    "name": "Valor Estimado Execução Projeto",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Estimado Execução Projeto",
+    "help": "Origem de referência: PIPELINE, coluna O."
+  },
+  {
+    "id": "valor",
+    "name": "Investimento previsto da obra",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Estimado Execução Obra",
+    "help": "Estimativa de execução da obra. Não somar novamente ao Valor Total ou aos subtotais anuais."
+  },
+  {
+    "id": "executado",
+    "name": "Valor Executado",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Executado",
+    "help": "Origem de referência: PIPELINE, coluna Q."
+  },
+  {
+    "id": "captado",
+    "name": "Valor Captado",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Captado",
+    "help": "Origem de referência: PIPELINE, coluna R."
+  },
+  {
+    "id": "contrapartida",
+    "name": "Contrapartida Municipio",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Contrapartida Municipio",
+    "help": "Origem de referência: PIPELINE, coluna S."
+  },
+  {
+    "id": "fonte",
+    "name": "Fonte de Recursos",
+    "type": "select",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Fonte de Recursos",
+    "help": "Origem de referência: PIPELINE, coluna T.",
+    "options": [
+      "Recurso federal",
+      "Financiamento",
+      "Tesouro",
+      "Emenda",
+      "Termo de compromisso",
+      "Outra",
+      "A definir"
+    ]
+  },
+  {
+    "id": "programa",
+    "name": "Programa / Gestor",
+    "type": "text",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Programa / Gestor",
+    "help": "Origem de referência: PIPELINE, coluna U."
+  },
+  {
+    "id": "financiadora",
+    "name": "Unidade Financiadora",
+    "type": "text",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Unidade Financiadora",
+    "help": "Origem de referência: PIPELINE, coluna V."
+  },
+  {
+    "id": "financiar",
+    "name": "Sugestão de Financiar",
+    "type": "boolean",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Sugestão de Financiar",
+    "help": "Origem de referência: PIPELINE, coluna W."
+  },
+  {
+    "id": "status",
+    "name": "Status do Projeto",
+    "type": "select",
+    "group": "Essenciais",
+    "sourceLabel": "Status do Projeto",
+    "help": "Origem de referência: PIPELINE, coluna X.",
+    "options": [
+      "Em planejamento",
+      "Em andamento",
+      "Paralisado",
+      "Concluído",
+      "Cancelado",
+      "Em análise"
+    ]
+  },
+  {
+    "id": "inicio",
+    "name": "Data Início do Projeto",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Data Início do Projeto",
+    "help": "Origem de referência: PIPELINE, coluna Y."
+  },
+  {
+    "id": "prev_planejamento",
+    "name": "Previsão Planejamento",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Planejamento",
+    "help": "Origem de referência: PIPELINE, coluna Z."
+  },
+  {
+    "id": "prev_preparatorio",
+    "name": "Previsão Preparatório",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Preparatório",
+    "help": "Origem de referência: PIPELINE, coluna AA."
+  },
+  {
+    "id": "prev_contratacao",
+    "name": "Previsão Contratação",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Contratação",
+    "help": "Origem de referência: PIPELINE, coluna AB."
+  },
+  {
+    "id": "prev_mobilizacao",
+    "name": "Previsão Mobilizaçao",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Mobilizaçao",
+    "help": "Origem de referência: PIPELINE, coluna AC."
+  },
+  {
+    "id": "execucao_origem",
+    "name": "Previsão de execução — conteúdo de origem",
+    "type": "text",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Execução",
+    "help": "A coluna original mistura valores que podem representar duração. Confirme a unidade antes de transformar em data. O calendário não usa este campo."
+  },
+  {
+    "id": "prazo",
+    "name": "Previsão Encerramento",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Previsão Encerramento",
+    "help": "Origem de referência: PIPELINE, coluna AE."
+  },
+  {
+    "id": "tem_termo",
+    "name": "Termo de compromisso",
+    "type": "boolean",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Termo de compromisso",
+    "help": "Origem de referência: PIPELINE, coluna AF."
+  },
+  {
+    "id": "prioridade",
+    "name": "Prioridade",
+    "type": "select",
+    "group": "Essenciais",
+    "sourceLabel": "Prioridade",
+    "help": "Origem de referência: PIPELINE, coluna AG.",
+    "options": [
+      "Muito alta",
+      "Alta",
+      "Média",
+      "Baixa",
+      "Ainda não definida"
+    ]
+  },
+  {
+    "id": "numero_termo",
+    "name": "Número Termo",
+    "type": "text",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "Número Termo",
+    "help": "Origem de referência: PIPELINE, coluna AH."
+  },
+  {
+    "id": "classificacao_origem",
+    "name": "Classificação de origem — revisar",
+    "type": "text",
+    "group": "Acompanhamento",
+    "sourceLabel": "AINDA NÃO DEFINIDA",
+    "help": "Coluna original “AINDA NÃO DEFINIDA”. Confirmar seu significado com a equipe antes de usar em indicadores."
+  },
+  {
+    "id": "contratacao",
+    "name": "Contratação",
+    "type": "text",
+    "group": "Acompanhamento",
+    "sourceLabel": "Contratação",
+    "help": "Origem de referência: PIPELINE, coluna AJ."
+  },
+  {
+    "id": "solicitacoes_financeiras",
+    "name": "SOLICITAÇÕES FINANCEIRAS",
+    "type": "text",
+    "group": "Recursos e instrumentos",
+    "sourceLabel": "SOLICITAÇÕES FINANCEIRAS",
+    "help": "Origem de referência: PIPELINE, coluna AK."
+  },
+  {
+    "id": "valor_total",
+    "name": "VALOR TOTAL",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "VALOR TOTAL",
+    "help": "Valor total informado na fonte. Conferir a relação com o investimento da obra e com os subtotais antes de consolidar."
+  },
+  {
+    "id": "total_2026",
+    "name": "Valor Subtotal 2026",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Subtotal 2026",
+    "help": "Origem de referência: PIPELINE, coluna AM."
+  },
+  {
+    "id": "total_2027",
+    "name": "Valor Subtotal 2027",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Subtotal 2027",
+    "help": "Origem de referência: PIPELINE, coluna AN."
+  },
+  {
+    "id": "total_2028",
+    "name": "Valor Subtotal 2028",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Subtotal 2028",
+    "help": "Origem de referência: PIPELINE, coluna AO."
+  },
+  {
+    "id": "federal_total",
+    "name": "Valores Recursos Federais",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valores Recursos Federais",
+    "help": "Origem de referência: PIPELINE, coluna AP."
+  },
+  {
+    "id": "federal_2026",
+    "name": "Recursos Federais 2026.",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Federais 2026.",
+    "help": "Origem de referência: PIPELINE, coluna AQ."
+  },
+  {
+    "id": "federal_2027",
+    "name": "Recursos Federais 2027",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Federais 2027",
+    "help": "Origem de referência: PIPELINE, coluna AR."
+  },
+  {
+    "id": "federal_2028",
+    "name": "Recursos Federais 2028",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Federais 2028",
+    "help": "Origem de referência: PIPELINE, coluna AS."
+  },
+  {
+    "id": "municipal_total",
+    "name": "Valor Recursos Municipais",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Recursos Municipais",
+    "help": "Origem de referência: PIPELINE, coluna AT."
+  },
+  {
+    "id": "municipal_2026",
+    "name": "Recursos Municipais 2026",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Municipais 2026",
+    "help": "Origem de referência: PIPELINE, coluna AU."
+  },
+  {
+    "id": "municipal_2027",
+    "name": "Recursos Municipais 2027",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Municipais 2027",
+    "help": "Origem de referência: PIPELINE, coluna AV."
+  },
+  {
+    "id": "municipal_2028",
+    "name": "Recursos Municipais 2028",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos Municipais 2028",
+    "help": "Origem de referência: PIPELINE, coluna AW."
+  },
+  {
+    "id": "outros_total",
+    "name": "Valor Recursos - Outros",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Valor Recursos - Outros",
+    "help": "Origem de referência: PIPELINE, coluna AX."
+  },
+  {
+    "id": "outros_2026",
+    "name": "Recursos - Outros 2026",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos - Outros 2026",
+    "help": "Origem de referência: PIPELINE, coluna AY."
+  },
+  {
+    "id": "outros_2027",
+    "name": "Recursos - Outros 2027",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos - Outros 2027",
+    "help": "Origem de referência: PIPELINE, coluna AZ."
+  },
+  {
+    "id": "outros_2028",
+    "name": "Recursos - Outros 2028",
+    "type": "currency",
+    "group": "Financeiro",
+    "sourceLabel": "Recursos - Outros 2028",
+    "help": "Origem de referência: PIPELINE, coluna BA."
+  },
+  {
+    "id": "atualizado_por",
+    "name": "Responsável pela Atualização",
+    "type": "text",
+    "group": "Acompanhamento",
+    "sourceLabel": "Responsável pela Atualização",
+    "help": "Origem de referência: PIPELINE, coluna BB."
+  },
+  {
+    "id": "atualizado_em",
+    "name": "Data da última Atualização",
+    "type": "date",
+    "group": "Prazos e marcos",
+    "sourceLabel": "Data da última Atualização",
+    "help": "Origem de referência: PIPELINE, coluna BC."
+  }
+]

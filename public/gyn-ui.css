@@ -1,0 +1,1353 @@
+/* =============================================================================
+   gyn-ui.css — GYN UI (Design System Visual da Prefeitura de Goiânia, v1.1)
+   aplicado ao portal Conecta · SECAP.
+
+   Carregar POR ÚLTIMO (depois de portal.css). Este arquivo só sobrepõe a
+   aparência: não altera a estrutura nem o comportamento do sistema.
+   Para voltar ao visual anterior, remova a linha <link rel="stylesheet"
+   href="gyn-ui.css"> do index.html.
+
+   Índice
+   1. Tokens (marca, neutros, semânticos, tipografia, espaçamento)
+   2. Base, foco e tipografia
+   3. Faixa institucional, cabeçalho e menu lateral
+   4. Página, painéis e KPIs
+   5. Botões
+   6. Formulários e busca
+   7. Status (badges), tabelas e listas
+   8. Janelas (modais), aviso (toast) e estados vazios
+   9. Login
+   10. Movimento reduzido e impressão
+   ========================================================================== */
+
+/* 1. TOKENS ----------------------------------------------------------------- */
+:root {
+  /* Marca (oficiais) */
+  --gyn-navy: #002f47;
+  --gyn-orange: #f37021;
+  --gyn-green: #194621;
+  --gyn-yellow: #fff200;
+  /* Paleta secundária */
+  --gyn-secondary-red: #ed1c24;
+  --gyn-secondary-blue: #2484c6;
+  --gyn-secondary-cyan: #44c8f5;
+  --gyn-secondary-green: #266a36;
+  --gyn-secondary-lime: #72bf44;
+  --gyn-secondary-gold: #ffca32;
+  /* Neutros funcionais */
+  --gyn-ink: #2a454a;
+  --gyn-ink-secondary: #58595b;
+  --gyn-surface: #f2f4f4;
+  --gyn-canvas: #e1e5e7;
+  --gyn-line: #d8dede;
+  --gyn-control-border: #58595b;
+  --gyn-white: #ffffff;
+  --gyn-on-dark-muted: #e1e5e7;
+  /* Semânticos */
+  --gyn-action-bg: var(--gyn-navy);
+  --gyn-action-fg: var(--gyn-white);
+  --gyn-accent-bg: var(--gyn-orange);
+  --gyn-accent-fg: var(--gyn-navy);
+  --gyn-success: #194621;
+  --gyn-error: #c93636;
+  --gyn-warning-bg: #fff200;
+  --gyn-warning-fg: #002f47;
+  --gyn-info: #002f47;
+  --gyn-success-bg: #e6efe8;
+  --gyn-error-bg: #fbecec;
+  --gyn-info-bg: #e6eef2;
+  --gyn-orange-bg: #fdeee6;
+  /* Tipografia */
+  --gyn-font: "Poppins", "Inter", "Segoe UI", Arial, sans-serif;
+  --fs-display: 2.5rem;
+  --lh-display: 3rem;
+  --fs-h1: 2.25rem;
+  --lh-h1: 2.6875rem;
+  --fs-sub: 1.25rem;
+  --lh-sub: 1.75rem;
+  --fs-body: 1rem;
+  --lh-body: 1.5625rem;
+  --fs-label: 0.875rem;
+  --lh-label: 1.125rem;
+  /* Espaçamento (escala de 4 px) */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  /* Forma, foco, alvo mínimo */
+  --gyn-radius: 10px;
+  --gyn-focus-color: #002f47;
+  --gyn-focus-offset: 3px;
+  --alvo-min: 44px;
+  --gyn-faixa: 10px;
+  --sombra: 0 1px 2px rgba(0, 47, 71, 0.08), 0 4px 12px rgba(0, 47, 71, 0.08);
+
+  /* Variáveis legadas do sistema, remapeadas para os tokens acima */
+  --navy: var(--gyn-navy);
+  --deep: var(--gyn-navy);
+  --orange: var(--gyn-orange);
+  --green: var(--gyn-green);
+  --cyan: var(--gyn-secondary-blue);
+  --ink: var(--gyn-ink);
+  --muted: var(--gyn-ink-secondary);
+  --line: var(--gyn-line);
+  --bg: var(--gyn-canvas);
+  --white: #fff;
+  --color-primary: var(--gyn-navy);
+  --color-primary-600: #0a4466;
+  --color-secondary: var(--gyn-green);
+  --color-accent: var(--gyn-yellow);
+  --color-accent-2: var(--gyn-orange);
+  --color-bg: var(--gyn-white);
+  --color-surface: var(--gyn-canvas);
+  --color-border: var(--gyn-line);
+  --color-text: var(--gyn-ink);
+  --color-muted: var(--gyn-ink-secondary);
+  --color-focus: var(--gyn-navy);
+  --radius-card: var(--gyn-radius);
+  --radius-ctl: var(--gyn-radius);
+  --shadow-card: var(--sombra);
+  --shadow-hover: 0 2px 4px rgba(0, 47, 71, 0.1), 0 8px 20px rgba(0, 47, 71, 0.12);
+  --font: var(--gyn-font);
+  --tile: transparent;
+  --tile-active: rgba(255, 255, 255, 0.1);
+}
+
+/* Foco adaptativo: azul no claro, amarelo nos fundos escuros */
+.sidebar,
+.main > header,
+header,
+.dialoghead,
+#toast,
+.stat,
+.loginart,
+.pagefooter {
+  --gyn-focus-color: #fff200;
+}
+
+/* 2. BASE, FOCO E TIPOGRAFIA ----------------------------------------------- */
+body {
+  font-family: var(--gyn-font);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 400;
+  color: var(--gyn-ink);
+  background: var(--gyn-canvas);
+  letter-spacing: 0;
+}
+.main,
+.content {
+  background: transparent;
+}
+button,
+input,
+select,
+textarea {
+  font-family: var(--gyn-font);
+}
+a {
+  color: var(--gyn-link, var(--gyn-navy));
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--gyn-focus-color) !important;
+  outline-offset: var(--gyn-focus-offset);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--gyn-font);
+  color: var(--gyn-navy);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+h1 {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+h2 {
+  font-size: var(--fs-sub);
+  line-height: var(--lh-sub);
+}
+h3 {
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
+}
+@media (max-width: 700px) {
+  :root {
+    --fs-display: 2rem;
+    --lh-display: 2.5rem;
+    --fs-h1: 1.75rem;
+    --lh-h1: 2.25rem;
+  }
+}
+p {
+  line-height: var(--lh-body);
+}
+.subtitle,
+.muted,
+small {
+  color: var(--gyn-ink-secondary);
+}
+.eyebrow {
+  font-family: var(--gyn-font);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--gyn-ink-secondary);
+}
+
+/* 3. FAIXA, CABEÇALHO E MENU LATERAL --------------------------------------- */
+.stripe {
+  height: var(--gyn-faixa);
+  /* navy (resto) + laranja 8% + verde 8% + amarelo 8% */
+  background: linear-gradient(
+    90deg,
+    var(--gyn-navy) 0 76%,
+    var(--gyn-orange) 76% 84%,
+    var(--gyn-green) 84% 92%,
+    var(--gyn-yellow) 92% 100%
+  );
+}
+
+/* Cabeçalho (azul, texto branco) */
+.main > header,
+header {
+  margin-top: var(--gyn-faixa);
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border-bottom: 0;
+  box-shadow: none;
+}
+.crumb,
+.crumb span,
+.crumb a {
+  color: var(--gyn-on-dark-muted);
+  background: transparent;
+  font-size: var(--fs-label);
+}
+.crumb b {
+  color: var(--gyn-white);
+  font-weight: 600;
+}
+.header-sep {
+  background: rgba(255, 255, 255, 0.3);
+}
+.version {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gyn-on-dark-muted);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+.headright .iconbtn,
+header .iconbtn,
+.mobilemenu {
+  background: transparent;
+  color: var(--gyn-white);
+  border: 2px solid transparent;
+  border-radius: var(--gyn-radius);
+  min-width: var(--alvo-min);
+  min-height: var(--alvo-min);
+  box-shadow: none;
+}
+.headright .iconbtn:hover,
+header .iconbtn:hover,
+.mobilemenu:hover {
+  background: transparent;
+  border-color: var(--gyn-white);
+  color: var(--gyn-white);
+}
+.headright svg,
+header .iconbtn svg {
+  color: currentColor;
+}
+.system-button {
+  min-height: var(--alvo-min);
+  padding: 0 var(--s4);
+  background: transparent;
+  color: var(--gyn-white);
+  border: 2px solid var(--gyn-white);
+  border-radius: var(--gyn-radius);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.system-button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.user,
+.user b {
+  color: var(--gyn-white);
+}
+.user b {
+  font-weight: 600;
+}
+.user small,
+.user small svg {
+  color: var(--gyn-on-dark-muted);
+}
+.user .avatar,
+header .avatar {
+  background: var(--gyn-yellow);
+  color: var(--gyn-navy);
+  font-weight: 700;
+}
+
+/* Menu lateral (azul; ativo em amarelo; hover em laranja) */
+.sidebar {
+  top: var(--gyn-faixa);
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border-right: 0;
+  font-family: var(--gyn-font);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  height: auto;
+  margin: 0;
+  padding: var(--s4) var(--s3) var(--s4);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+}
+.brand img,
+.brand .brand-logo {
+  flex: none;
+  width: auto;
+  height: 72px;
+  max-width: none;
+  object-fit: contain;
+}
+.brand-texto {
+  min-width: 0;
+}
+.brand-orgao {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--gyn-on-dark-muted);
+}
+.brand-sistema {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--gyn-white);
+}
+
+.sidebar .sidebar-profile,
+.sidebar-profile {
+  background: transparent;
+  color: var(--gyn-white);
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+}
+.sidebar .sidebar-profile:hover,
+.sidebar-profile:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.sidebar .sidebar-profile b,
+.sidebar-profile-copy b {
+  color: var(--gyn-white);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.sidebar .sidebar-profile small,
+.sidebar-profile-copy small {
+  color: var(--gyn-on-dark-muted);
+  font-size: 0.75rem;
+}
+.sidebar-profile-edit,
+.sidebar-profile-edit svg {
+  color: var(--gyn-on-dark-muted);
+}
+.sidebar .profile-avatar,
+.sidebar .sidebar-profile-avatar .profile-avatar {
+  background: var(--gyn-yellow);
+  color: var(--gyn-navy);
+  border-color: var(--gyn-yellow);
+  font-weight: 700;
+}
+.sidebar .navlabel,
+.navlabel {
+  color: var(--gyn-on-dark-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.sidebar .nav,
+.sidebar .sidebarfooter .nav {
+  min-height: var(--alvo-min);
+  color: var(--gyn-white);
+  font-family: var(--gyn-font);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  background: transparent;
+  border-radius: 0;
+  border-left: 4px solid transparent;
+}
+.sidebar .nav svg {
+  color: currentColor;
+  stroke: currentColor;
+}
+.sidebar .nav:hover,
+.sidebar .sidebarfooter .nav:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-left-color: var(--gyn-orange);
+  color: var(--gyn-white);
+}
+.sidebar .nav.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--gyn-yellow);
+  color: var(--gyn-yellow);
+}
+.sidebar .nav.active svg {
+  color: var(--gyn-yellow);
+  stroke: currentColor;
+}
+.sidebar .nav em,
+.nav em {
+  background: var(--gyn-orange);
+  color: var(--gyn-navy);
+  font-style: normal;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 7px;
+  min-width: 1.5rem;
+  text-align: center;
+}
+.sidebarfooter {
+  color: var(--gyn-on-dark-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+.sidebarfooter b {
+  color: var(--gyn-white);
+}
+.sidebarfooter .dot {
+  background: var(--gyn-yellow);
+}
+
+/* Botão de recolher o menu (hambúrguer/X) */
+@media (min-width: 721px) {
+  #menu-toggle {
+    top: calc(var(--gyn-faixa) + 14px);
+    background: transparent;
+    border: 2px solid var(--gyn-white);
+    border-radius: var(--gyn-radius);
+    box-shadow: none;
+    width: 36px;
+    height: 36px;
+  }
+  #menu-toggle span {
+    background: var(--gyn-white);
+  }
+  #menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--gyn-yellow);
+    box-shadow: none;
+  }
+  #menu-toggle:hover span {
+    background: var(--gyn-yellow);
+  }
+  /* menu recolhido: o botão fica sobre o cabeçalho azul */
+  body.menu-collapsed #menu-toggle {
+    top: calc(var(--gyn-faixa) + 20px);
+  }
+}
+
+/* Rodapé (azul) */
+.pagefooter {
+  margin-top: var(--s6);
+  padding: var(--s4) var(--s5);
+  background: var(--gyn-navy);
+  color: var(--gyn-on-dark-muted);
+  border: 0;
+  border-radius: var(--gyn-radius);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+}
+
+/* 4. PÁGINA, PAINÉIS E KPIs ------------------------------------------------ */
+.content {
+  padding-top: var(--s6);
+}
+.pagehead {
+  border-bottom: 1px solid var(--gyn-line);
+}
+.pagehead::after {
+  background: var(--gyn-orange);
+  height: 4px;
+}
+.pagehead h1 {
+  font-weight: 600;
+  color: var(--gyn-navy);
+}
+.pagehead .subtitle {
+  color: var(--gyn-ink-secondary);
+  max-width: 72ch;
+}
+
+.panel,
+.detail-card,
+.note,
+.project,
+.tcard,
+.kpi-detail-row {
+  background: var(--gyn-white);
+  border: 1px solid var(--gyn-line);
+  border-radius: var(--gyn-radius);
+  box-shadow: var(--sombra);
+}
+.project:hover,
+.note:hover,
+.tcard:hover {
+  border-color: var(--gyn-navy);
+  box-shadow: var(--sombra);
+  transform: none;
+}
+.panelhead {
+  background: var(--gyn-surface);
+  border-bottom: 1px solid var(--gyn-line);
+}
+.panelhead h2,
+.panelhead h3 {
+  color: var(--gyn-navy);
+  font-weight: 600;
+}
+.panelhead p,
+.panelhead small,
+.panelhead span {
+  color: var(--gyn-ink-secondary);
+}
+
+/* KPIs: bloco azul, rótulo claro, valor em amarelo */
+.stat,
+.stat.kpi-card {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border: 3px solid transparent;
+  border-radius: var(--gyn-radius);
+  box-shadow: none;
+}
+.stat:nth-child(n) {
+  border-top-color: transparent;
+}
+.stat:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--gyn-white);
+}
+.stat[aria-pressed="true"] {
+  border-color: var(--gyn-yellow);
+}
+.stat .top,
+.stat .top span,
+.stat .kpi-header .top {
+  color: var(--gyn-on-dark-muted);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.stat .top svg,
+.stat svg {
+  color: var(--gyn-yellow);
+  stroke: currentColor;
+}
+.stat .number {
+  color: var(--gyn-yellow);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.stat .foot,
+.stat .foot b,
+.stat .kpi-subtext,
+.stat small {
+  color: var(--gyn-on-dark-muted);
+}
+.stat .kpi-link {
+  color: var(--gyn-yellow);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.stat.kpi-card.warning {
+  border-color: var(--gyn-orange);
+}
+.stat.kpi-card.warning .top,
+.stat.kpi-card.warning .kpi-link,
+.stat.kpi-card.warning .number {
+  color: var(--gyn-orange) !important;
+}
+.stat .progress,
+.stat .bar {
+  background: rgba(255, 255, 255, 0.25);
+}
+.stat .progress i,
+.stat .bar i {
+  background: var(--gyn-yellow);
+}
+
+/* KPIs do painel (.dkpi): mesmo padrão — o marcador lateral mantém o sentido
+   de cada indicador (azul/ciano/verde/laranja/vermelho) sobre o fundo azul */
+.dkpi {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border: 3px solid transparent;
+  border-radius: var(--gyn-radius);
+  box-shadow: none;
+  --k: var(--gyn-yellow);
+}
+.dkpi.navy {
+  --k: var(--gyn-yellow);
+}
+.dkpi.cyan {
+  --k: var(--gyn-secondary-cyan);
+}
+.dkpi.green {
+  --k: var(--gyn-secondary-lime);
+}
+.dkpi.orange {
+  --k: var(--gyn-orange);
+}
+.dkpi.red {
+  --k: #ff5a60; /* vermelho da paleta clareado: contraste ≥ 4,5:1 sobre o azul */
+}
+.dkpi::before {
+  width: 6px;
+}
+.dkpi.is-link:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--gyn-white);
+}
+.dkpi-ico {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--k);
+}
+.dkpi-label {
+  color: var(--gyn-on-dark-muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.dkpi-num {
+  color: var(--gyn-yellow);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.dkpi-sub {
+  color: var(--gyn-on-dark-muted);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+}
+.dkpi-bar {
+  background: rgba(255, 255, 255, 0.25);
+}
+.dkpi-bar i {
+  background: var(--gyn-yellow);
+}
+
+/* Barra de personalização de contêineres (fontes mínimas do DS: 14 px) */
+.page-layout-toolbar {
+  background: var(--gyn-info-bg);
+  border: 1px solid var(--gyn-line);
+  border-radius: var(--gyn-radius);
+}
+.layout-toolbar-icon {
+  background: var(--gyn-navy);
+  color: var(--gyn-yellow);
+  border-radius: 50%;
+}
+.page-layout-toolbar strong {
+  color: var(--gyn-navy);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.page-layout-toolbar small {
+  color: var(--gyn-ink-secondary);
+  font-size: 0.8125rem;
+}
+.page-layout-toolbar .btn,
+.layout-edit-footer .btn,
+.custom-section > .panelhead .btn {
+  font-size: var(--fs-label);
+  min-height: var(--alvo-min);
+  padding: var(--s2) var(--s4);
+}
+.page-layout-toolbar select {
+  font-size: var(--fs-label);
+  min-height: var(--alvo-min);
+  border: 2px solid var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  background: var(--gyn-white);
+}
+.layout-edit-footer > span,
+.container-tools > span,
+.container-list-row p,
+.hidden-container,
+.hidden-container .textbtn {
+  font-size: 0.8125rem;
+  color: var(--gyn-ink-secondary);
+}
+.page-container.is-editing {
+  border: 2px dashed var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  background: var(--gyn-surface);
+}
+.container-tools > div {
+  background: var(--gyn-white);
+  border: 1px solid var(--gyn-line);
+}
+.container-tools .iconbtn {
+  color: var(--gyn-navy);
+}
+.container-list-row b {
+  color: var(--gyn-navy);
+  font-size: var(--fs-label);
+}
+.container-text {
+  color: var(--gyn-ink-secondary);
+}
+
+/* 5. BOTÕES ---------------------------------------------------------------- */
+/* Padrão = Contorno (azul sobre branco). Principal = branco sobre azul.
+   Destaque = azul sobre laranja. Sucesso = branco sobre verde. */
+.btn {
+  min-height: var(--alvo-min);
+  padding: var(--s2) var(--s4);
+  background: var(--gyn-white);
+  color: var(--gyn-navy);
+  border: 2px solid var(--gyn-navy);
+  border-radius: var(--gyn-radius);
+  font-family: var(--gyn-font);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 1.25;
+  box-shadow: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.btn svg {
+  color: currentColor;
+  stroke: currentColor;
+}
+.btn:hover {
+  background: var(--gyn-white);
+  border-color: var(--gyn-navy);
+  box-shadow: inset 0 0 0 1px var(--gyn-navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn.primary {
+  background: var(--gyn-action-bg);
+  color: var(--gyn-action-fg);
+  border-color: var(--gyn-action-bg);
+}
+.btn.primary:hover {
+  background: var(--gyn-action-bg);
+  border-color: var(--gyn-white);
+  box-shadow: 0 0 0 2px var(--gyn-navy);
+}
+.btn.orange,
+.btn.accent {
+  background: var(--gyn-accent-bg);
+  color: var(--gyn-accent-fg);
+  border-color: var(--gyn-accent-bg);
+}
+.btn.orange:hover,
+.btn.accent:hover {
+  background: var(--gyn-accent-bg);
+  border-color: var(--gyn-navy);
+  box-shadow: inset 0 0 0 1px var(--gyn-navy);
+}
+.btn.green,
+.btn.success {
+  background: var(--gyn-success);
+  color: var(--gyn-white);
+  border-color: var(--gyn-success);
+}
+.btn.green:hover,
+.btn.success:hover {
+  background: var(--gyn-success);
+  border-color: var(--gyn-white);
+  box-shadow: 0 0 0 2px var(--gyn-success);
+}
+.btn.danger,
+.btn.red {
+  background: var(--gyn-white);
+  color: var(--gyn-error);
+  border-color: var(--gyn-error);
+}
+.btn[disabled],
+.btn:disabled,
+button.btn:disabled {
+  background: var(--gyn-canvas);
+  color: var(--gyn-ink-secondary);
+  border-color: #a7a9ac;
+  box-shadow: none;
+  text-decoration: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.textbtn,
+.kpi-link {
+  color: var(--gyn-navy);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.iconbtn {
+  color: var(--gyn-navy);
+  border-radius: var(--gyn-radius);
+}
+.iconbtn:hover {
+  border-color: var(--gyn-navy);
+}
+
+/* 6. FORMULÁRIOS E BUSCA --------------------------------------------------- */
+label,
+.field label {
+  color: var(--gyn-ink);
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.field small {
+  color: var(--gyn-ink-secondary);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+}
+.field input,
+.field textarea,
+.field select,
+.filters select,
+.filters > input:not([type="checkbox"]):not([type="radio"]),
+input.input,
+select.input {
+  min-height: var(--alvo-min);
+  background: var(--gyn-white);
+  color: var(--gyn-ink);
+  border: 2px solid var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  font-family: var(--gyn-font);
+  font-size: var(--fs-body);
+  box-shadow: none;
+}
+.field input:hover,
+.field select:hover,
+.field textarea:hover,
+.filters select:hover {
+  border-color: var(--gyn-navy);
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus,
+.filters select:focus {
+  border-color: var(--gyn-orange);
+  box-shadow: none;
+  outline: 3px solid var(--gyn-focus-color) !important;
+  outline-offset: var(--gyn-focus-offset);
+}
+.field input[aria-invalid="true"],
+.field input:user-invalid,
+.field select:user-invalid,
+.field textarea:user-invalid {
+  border-color: var(--gyn-error);
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--gyn-navy);
+}
+
+/* Barra de busca: campo branco, borda funcional, botão de busca em laranja
+   (Destaque: ícone em azul sobre laranja) */
+.search {
+  background: var(--gyn-white);
+  border: 2px solid var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  box-shadow: none;
+}
+.search:hover {
+  border-color: var(--gyn-navy);
+}
+.search:focus-within {
+  border-color: var(--gyn-orange);
+  box-shadow: none;
+  outline: 3px solid var(--gyn-navy);
+  outline-offset: var(--gyn-focus-offset);
+}
+.search input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none !important;
+  color: var(--gyn-ink);
+}
+.search > svg,
+.search > span:first-child,
+.search > i {
+  background: var(--gyn-orange);
+  color: var(--gyn-navy);
+  border-radius: calc(var(--gyn-radius) - 4px);
+}
+.filters {
+  background: transparent;
+}
+
+/* 7. STATUS, TABELAS E LISTAS ---------------------------------------------- */
+/* Status = texto + cor + marcador (nunca apenas cor) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  background: var(--gyn-white);
+  color: var(--gyn-info);
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badge.green {
+  color: var(--gyn-success);
+  background: var(--gyn-white);
+}
+.badge.orange {
+  color: var(--gyn-warning-fg);
+  background: var(--gyn-warning-bg); /* atenção: azul em amarelo */
+}
+.badge.red {
+  color: var(--gyn-error);
+  background: var(--gyn-white);
+}
+.badge.gray {
+  color: var(--gyn-ink-secondary);
+  background: var(--gyn-white);
+}
+
+/* Tabelas */
+.tablewrap {
+  background: var(--gyn-white);
+  border-radius: 0 0 var(--gyn-radius) var(--gyn-radius);
+}
+table {
+  font-family: var(--gyn-font);
+}
+th,
+.tablewrap th,
+.tablewrap thead th,
+thead th {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom: 0;
+}
+td,
+.tablewrap td {
+  color: var(--gyn-ink);
+  border-bottom: 1px solid var(--gyn-line);
+}
+tbody tr:hover td {
+  background: var(--gyn-surface);
+}
+.tablefoot {
+  background: var(--gyn-surface);
+  border-top: 1px solid var(--gyn-line);
+  color: var(--gyn-ink-secondary);
+}
+
+/* Barra de progresso */
+.progress {
+  background: var(--gyn-canvas);
+  border-radius: 999px;
+}
+.progress i {
+  background: var(--gyn-green);
+  border-radius: 999px;
+}
+
+/* Alternância Tabela / Cards e abas */
+.seg,
+.viewswitch,
+.tabs {
+  background: var(--gyn-canvas);
+  border: 2px solid var(--gyn-navy);
+  border-radius: var(--gyn-radius);
+}
+.seg button,
+.viewswitch button,
+.tabs button {
+  color: var(--gyn-navy);
+  font-weight: 600;
+  border-radius: calc(var(--gyn-radius) - 3px);
+}
+.seg button.active,
+.viewswitch button.active,
+.tabs button.active,
+.seg button[aria-pressed="true"],
+.viewswitch button[aria-pressed="true"] {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  box-shadow: none;
+}
+
+/* 8. JANELAS, AVISO E ESTADOS VAZIOS --------------------------------------- */
+.overlay {
+  background: rgba(0, 47, 71, 0.65);
+  backdrop-filter: none;
+}
+.dialog,
+#modal .modal,
+.modal {
+  background: var(--gyn-white);
+  color: var(--gyn-ink);
+  border: 0;
+  border-radius: var(--gyn-radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+.dialoghead {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border-bottom: 0;
+}
+.dialoghead h2,
+.dialoghead h3 {
+  color: var(--gyn-white);
+  font-size: var(--fs-sub);
+  line-height: var(--lh-sub);
+  font-weight: 600;
+}
+.dialoghead .iconbtn,
+.dialoghead button {
+  color: var(--gyn-white);
+  background: transparent;
+  border: 2px solid transparent;
+  min-width: var(--alvo-min);
+  min-height: var(--alvo-min);
+}
+.dialoghead .iconbtn:hover,
+.dialoghead button:hover {
+  border-color: var(--gyn-white);
+  background: transparent;
+}
+.dialoghead svg {
+  color: currentColor;
+  stroke: currentColor;
+}
+.dialogbody {
+  background: var(--gyn-white);
+}
+.dialogfoot {
+  background: var(--gyn-surface);
+  border-top: 1px solid var(--gyn-line);
+}
+@media (max-width: 700px) {
+  .overlay {
+    padding: 0;
+  }
+  .dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+}
+
+#toast {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  border-left: 6px solid var(--gyn-success);
+  border-radius: var(--gyn-radius);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.empty,
+.vazio {
+  background: var(--gyn-surface);
+  color: var(--gyn-ink-secondary);
+  border: 2px dashed var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+}
+.empty h3 {
+  color: var(--gyn-navy);
+}
+.empty svg {
+  color: var(--gyn-navy);
+}
+
+/* 9. LOGIN ----------------------------------------------------------------- */
+.login {
+  background: var(--gyn-white);
+}
+.loginart {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+}
+.loginart::after,
+.loginart:after {
+  display: none;
+}
+.loginart img,
+.loginart .loginart-logo {
+  width: auto;
+  height: 120px;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.loginart h1 {
+  color: var(--gyn-white);
+  font-weight: 600;
+}
+.loginart p {
+  color: var(--gyn-on-dark-muted);
+}
+.loginart .eyebrow {
+  color: var(--gyn-yellow);
+}
+.loginform {
+  background: var(--gyn-white);
+}
+.loginform h1 {
+  color: var(--gyn-navy);
+  font-weight: 600;
+}
+.loginform .eyebrow {
+  color: var(--gyn-ink-secondary);
+}
+.loginform .btn {
+  min-height: var(--alvo-min);
+}
+.login-divider {
+  color: var(--gyn-ink-secondary);
+  font-weight: 600;
+}
+.login-create {
+  color: var(--gyn-navy);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.loginform [role="status"],
+#authMessage,
+#registerMessage {
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+/* 11. AJUSTES FINAIS ------------------------------------------------------- */
+/* Marca no menu: espaço para o botão de recolher */
+.sidebar > .brand {
+  padding-right: 56px;
+}
+
+/* Busca das pastas/obras */
+.filters {
+  background: var(--gyn-white);
+  border: 1px solid var(--gyn-line);
+  border-radius: var(--gyn-radius);
+  box-shadow: var(--sombra);
+}
+.filters .search {
+  background: var(--gyn-white);
+  border: 2px solid var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  box-shadow: none;
+}
+.filters .search:hover {
+  border-color: var(--gyn-navy);
+}
+.filters .search:focus-within {
+  border-color: var(--gyn-orange);
+  box-shadow: none;
+  outline: 3px solid var(--gyn-navy);
+  outline-offset: var(--gyn-focus-offset);
+}
+.filters .search > svg {
+  background: var(--gyn-orange);
+  color: var(--gyn-navy);
+  border-radius: 0;
+}
+.filters .search input {
+  font-size: var(--fs-body);
+  color: var(--gyn-ink);
+}
+.filters select {
+  background-color: var(--gyn-white);
+}
+.filters .right {
+  color: var(--gyn-ink-secondary);
+  font-size: var(--fs-label);
+}
+
+/* Alternância Tabela / Cards */
+.view-toggle {
+  background: var(--gyn-white);
+  border: 2px solid var(--gyn-navy);
+  border-radius: var(--gyn-radius);
+}
+.view-toggle button {
+  color: var(--gyn-navy);
+  font-size: var(--fs-label);
+  border-radius: 6px;
+}
+.view-toggle button:hover {
+  color: var(--gyn-navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.view-toggle button.is-on {
+  background: var(--gyn-navy);
+  color: var(--gyn-white);
+  box-shadow: none;
+}
+
+/* Estatísticas dentro das pastas (rótulos e ícones legíveis) */
+.stat .top {
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  text-transform: uppercase;
+}
+.stat .top svg {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.stat .foot {
+  font-size: var(--fs-label);
+}
+
+/* Formulário de edição de obra (cartões de campo) */
+.edit-section-title {
+  font-size: 1rem;
+  color: var(--gyn-navy);
+  border-bottom: 3px solid var(--gyn-orange);
+}
+.edit-cards-grid .field {
+  background: var(--gyn-white);
+  border: 1px solid var(--gyn-line);
+  border-radius: var(--gyn-radius);
+  box-shadow: none;
+}
+.edit-cards-grid .field label {
+  font-size: var(--fs-label);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--gyn-ink);
+}
+.edit-cards-grid .field input,
+.edit-cards-grid .field select,
+.edit-cards-grid .field textarea {
+  min-height: var(--alvo-min);
+  background-color: var(--gyn-white);
+  border: 2px solid var(--gyn-control-border);
+  border-radius: var(--gyn-radius);
+  color: var(--gyn-ink);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  padding: var(--s2) var(--s3);
+}
+.edit-cards-grid .field input:focus,
+.edit-cards-grid .field select:focus,
+.edit-cards-grid .field textarea:focus {
+  border-color: var(--gyn-orange);
+  background-color: var(--gyn-white);
+  outline: 3px solid var(--gyn-focus-color);
+  outline-offset: var(--gyn-focus-offset);
+}
+.metric-note,
+.record-form-intro .subtitle {
+  color: var(--gyn-ink-secondary);
+  font-size: var(--fs-label);
+}
+
+/* Janelas: cabeçalho e rodapé fixos, só o corpo rola */
+.dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 32px);
+}
+.dialoghead,
+.dialogfoot {
+  flex: none;
+}
+.dialogbody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 10. MOVIMENTO REDUZIDO E IMPRESSÃO --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .stripe,
+  .sidebar,
+  .main > header,
+  #menu-toggle,
+  #toast {
+    display: none !important;
+  }
+  .main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  body {
+    background: var(--gyn-white);
+  }
+}

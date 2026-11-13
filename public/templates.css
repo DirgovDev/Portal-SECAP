@@ -1,0 +1,664 @@
+.template-intro {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 35px;
+  padding: 28px 30px;
+  background: #eaf2f6;
+  border: 1px solid #dce8ee;
+  border-radius: 12px;
+  margin-bottom: 25px;
+}
+.template-intro h2 {
+  font-size: 21px;
+  margin: 9px 0 12px;
+}
+.template-intro p {
+  font-size: 12px;
+  color: #708a98;
+  max-width: 650px;
+  margin: 0;
+  line-height: 1.8;
+}
+.template-intro-note {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  font-size: 11px;
+  color: #5d7f92;
+  line-height: 1.8;
+  border-left: 1px solid #ccdde6;
+  padding-left: 30px;
+}
+.template-intro-note svg {
+  width: 26px;
+  height: 26px;
+}
+.model-library {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 21px;
+}
+.model-card {
+  padding: 25px;
+  border: 1px solid #dfe8ed;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.model-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 25px;
+  gap: 10px;
+}
+.model-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--model-color, #003856) 9%, white);
+  color: var(--model-color, #003856);
+  flex-shrink: 0;
+}
+.model-icon svg {
+  width: 21px;
+  height: 21px;
+}
+.model-card h2 {
+  font-size: 20px;
+  margin: 3px 0 13px;
+}
+.model-card > p {
+  font-size: 12px;
+  color: #7a929e;
+  margin: 0 0 20px;
+  line-height: 1.8;
+  min-height: 44px;
+}
+.model-card .eyebrow {
+  font-size: 8px;
+}
+.model-question {
+  border-left: 2px solid var(--model-color);
+  padding: 4px 0 4px 14px;
+  color: #446b80;
+  font-size: 12px;
+  line-height: 1.65;
+  margin: auto 0 23px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.model-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #8a9ea8;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f5;
+  margin-bottom: 19px;
+  gap: 15px;
+}
+.model-card-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.model-card-actions .btn {
+  font-size: 11px;
+}
+.model-checklist {
+  display: grid;
+  gap: 22px;
+}
+.model-checklist > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #607f90;
+}
+.model-checklist svg {
+  width: 17px;
+  height: 17px;
+  color: #7c9dad;
+}
+.model-tab-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+.model-tab-list span {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: #608093;
+}
+.model-tab-list b {
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: #88a1af;
+  background: #edf4f7;
+  border-radius: 5px;
+  width: 25px;
+  height: 25px;
+  font-weight: 500;
+}
+.schema-group,
+.record-group {
+  border: 1px solid #e0e9ee;
+  border-radius: 8px;
+  margin-bottom: 13px;
+  overflow: hidden;
+}
+.schema-group summary,
+.record-group summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 17px 19px;
+  background: #f8fafb;
+  color: #3f6478;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.schema-group summary::-webkit-details-marker,
+.record-group summary::-webkit-details-marker {
+  display: none;
+}
+.schema-group summary small,
+.record-group summary small {
+  margin-left: auto;
+  color: #8a9faa;
+  font-weight: 400;
+  font-size: 10px;
+}
+.schema-group summary svg,
+.record-group summary svg {
+  width: 14px;
+  height: 14px;
+  color: #809ba9;
+}
+.schema-group[open] summary svg,
+.record-group[open] summary svg {
+  transform: rotate(180deg);
+}
+.schema-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 30px;
+  padding: 10px 19px;
+}
+.schema-fields > div {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf2f5;
+  font-size: 11px;
+  color: #647f8f;
+}
+.schema-fields small {
+  font-size: 10px;
+  color: #9baab3;
+  white-space: nowrap;
+}
+.model-guideline {
+  padding: 21px 24px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #6a8798;
+  background: #eaf2f6;
+  border-radius: 9px;
+  margin-top: 23px;
+}
+.project-template-picker {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+.template-choice {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #e0e8ed;
+  background: #fff;
+  border-radius: 8px;
+  text-align: left;
+}
+.template-choice:hover {
+  border-color: #a8c2d2;
+  background: #fbfdfe;
+}
+.template-choice > span:nth-child(2) {
+  flex: 1;
+}
+.template-choice b {
+  display: block;
+  font-size: 13px;
+  color: #315c75;
+  margin-bottom: 6px;
+}
+.template-choice small {
+  font-size: 11px;
+  color: #8299a6;
+  line-height: 1.6;
+  display: block;
+}
+.template-choice > svg {
+  width: 15px;
+  height: 15px;
+  color: #88a2b1;
+}
+.record-group-fields {
+  padding: 20px 20px 0;
+}
+.record-group-fields .field:last-child {
+  margin-bottom: 20px;
+}
+.record-group-fields .field small {
+  font-size: 10px;
+}
+.annual-table {
+  font-variant-numeric: tabular-nums;
+}
+.annual-table small {
+  display: block;
+  font-size: 10px;
+  color: #8aa1ad;
+  margin-top: 6px;
+}
+.high .model-card,
+.high .template-choice {
+  background: #172b37;
+}
+.high .template-intro,
+.high .model-guideline {
+  background: #193b4f;
+}
+.high .schema-group summary,
+.high .record-group summary {
+  background: #203f52;
+  color: #fff;
+}
+.high .schema-fields > div {
+  color: #d4e4eb;
+}
+.high .model-question {
+  color: #d4e4eb;
+}
+@media (min-width: 1550px) {
+  .model-library {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .model-card-actions {
+    flex-wrap: wrap;
+  }
+  .model-card h2 {
+    font-size: 19px;
+  }
+}
+@media (max-width: 950px) {
+  .template-intro {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .template-intro-note {
+    border-left: 0;
+    border-top: 1px solid #ccdde6;
+    padding: 17px 0 0;
+  }
+  .model-library {
+    grid-template-columns: 1fr;
+  }
+  .model-card > p {
+    min-height: 0;
+  }
+  .model-question {
+    min-height: 0;
+  }
+  .schema-fields {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .template-intro {
+    padding: 22px;
+  }
+  .template-intro h2 {
+    font-size: 19px;
+  }
+  .template-intro p {
+    font-size: 11px;
+  }
+  .template-intro-note {
+    font-size: 10px;
+  }
+  .model-card {
+    padding: 23px;
+  }
+  .model-card h2 {
+    font-size: 19px;
+  }
+  .model-card-meta {
+    font-size: 9px;
+  }
+  .model-card-actions .btn {
+    padding: 10px 12px;
+    font-size: 10px;
+  }
+  .model-tab-list {
+    grid-template-columns: 1fr;
+  }
+  .schema-fields {
+    padding: 8px 14px;
+  }
+  .schema-fields > div {
+    font-size: 10px;
+  }
+  .schema-fields small {
+    font-size: 9px;
+  }
+  .record-group-fields {
+    padding: 17px 15px 0;
+  }
+  .schema-group summary,
+  .record-group summary {
+    padding: 15px;
+    font-size: 11px;
+  }
+  .template-choice {
+    padding: 13px;
+    gap: 11px;
+  }
+  .template-choice b {
+    font-size: 12px;
+  }
+  .template-choice small {
+    font-size: 10px;
+  }
+}
+/* ==========================================================================
+   DESTAQUE DOS GRUPOS E SEÇÕES (LINHA LARANJA SECAP)
+   ========================================================================== */
+
+/* Cabeçalho da Seção com Linha Laranja */
+.section-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 32px 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 3px solid #f37021 !important; /* Linha Laranja Oficial SECAP */
+  position: relative;
+}
+
+.section-group-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #003856; /* Azul Escuro Institucional */
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Tamanho e cor dos ícones nos títulos das seções */
+.section-group-header h2 svg,
+.section-group-header h2 i {
+  width: 18px;
+  height: 18px;
+  color: #f37021; /* Cor Laranja SECAP nos ícones */
+}
+
+/* Badge indicando a quantidade de campos da seção */
+.section-group-header .count-badge {
+  background-color: #fff3eb;
+  color: #f37021;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid #fde3d3;
+}
+
+/* Destaque para as Sanfonas/Grupos na Modal de Edição */
+details.record-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  background-color: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+details.record-group summary {
+  padding: 14px 18px;
+  font-weight: 700;
+  color: #003856;
+  background-color: #f8fafc;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+/* Borda Laranja quando o grupo estiver expandido */
+details.record-group[open] summary {
+  border-bottom-color: #f37021;
+  background-color: #ffffff;
+}
+
+details.record-group summary span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #003856;
+}
+/* Layout da seção de grupos de edição (estilo da imagem de referência) */
+.edit-section-group {
+  margin-bottom: 32px;
+}
+
+/* Títulos das seções (LOCALIZAÇÃO, PRAZOS E MARCOS, etc.) com a linha laranja SECAP */
+.edit-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #003856;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0 0 16px 0;
+  padding-bottom: 6px;
+  border-bottom: 3px solid #f37021; /* Linha Laranja SECAP */
+  display: inline-block;
+}
+
+/* Grade de cartões em até 4 colunas responsivas */
+.edit-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .edit-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .edit-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Estilo individual do cartão de input */
+.edit-cards-grid .field {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Rótulo do campo (em caixa alta e cinza) */
+.edit-cards-grid .field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Inputs, selects e textareas ajustados dentro do cartão */
+.edit-cards-grid .field input,
+.edit-cards-grid .field select,
+.edit-cards-grid .field textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #f8fafc;
+}
+
+.edit-cards-grid .field input:focus,
+.edit-cards-grid .field select:focus,
+.edit-cards-grid .field textarea:focus {
+  outline: none;
+  border-color: #f37021;
+  background-color: #ffffff;
+}
+
+/* Expande a modal para acomodar os cartões em 4 colunas */
+.dialog:has(.edit-cards-grid),
+.modal:has(.edit-cards-grid) {
+  max-width: 95vw !important;
+  width: 1400px !important;
+}
+
+/* Se a classe do container da modal for diferente no projeto */
+#modal .dialog,
+.modal-content {
+  max-width: 95vw;
+  width: 1350px;
+}
+
+/* Ajuste da grelha de cartões */
+.edit-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+/* Ajuste do Cartão para evitar esticar a altura desnecessariamente */
+.edit-cards-grid .field {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0;
+  min-height: 100px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Título de seção com a linha Laranja SECAP */
+.edit-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #003856;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 24px 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 3px solid #f37021;
+  display: inline-block;
+}
+
+/* Perfil e seleção de avatar na barra lateral */
+.sidebar-profile {
+  width: calc(100% - 24px);
+  margin: 12px 12px 18px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid #e7edf0;
+  border-radius: 10px;
+  background: #fff;
+  color: #233f4d;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.sidebar-profile:hover { border-color: #f37021; box-shadow: 0 2px 9px #17374612; }
+.sidebar-profile-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
+.sidebar-profile-copy b { overflow: hidden; color: #244452; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-profile-copy small { color: #82939b; font-size: 10px; }
+.sidebar-profile-edit { display: flex; color: #8a9aa1; }
+.sidebar-profile-edit svg { width: 14px; height: 14px; }
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid #f37021;
+  border-radius: 50%;
+  background: #fff4ec;
+  color: #a94c16;
+  font-size: 11px;
+  font-weight: 700;
+  object-fit: cover;
+}
+.sidebar-avatar { display: block; }
+.avatar-modal-help { margin: 0 0 14px; color: #667b85; font-size: 13px; }
+.avatar-options { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.avatar-choice { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 6px; padding: 9px 4px; border: 1px solid #e5eaed; border-radius: 9px; background: #fff; color: #526b76; cursor: pointer; font-size: 10px; }
+.avatar-choice:hover, .avatar-choice:focus-visible { border-color: #f37021; outline: none; }
+.avatar-choice img { width: 54px; height: 54px; border: 2px solid #f37021; border-radius: 50%; background: #fff4ec; }
+.avatar-custom-form { display: flex; align-items: end; gap: 10px; margin-top: 20px; }
+.avatar-custom-form .field { flex: 1; margin: 0; }
+.avatar-custom-form .btn { white-space: nowrap; }
+@media (max-width: 620px) {
+  .avatar-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .avatar-custom-form { align-items: stretch; flex-direction: column; }
+}
+
+/* Construtor de avatar personalizado */
+.avatar-builder { margin-top: 18px; padding: 14px; border: 1px solid #e5eaed; border-radius: 12px; background: #fbfcfd; }
+.avatar-builder h3 { margin: 0 0 12px; color: #244452; font-size: 14px; }
+.avatar-builder-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.avatar-builder-controls .field { margin: 0; }
+.avatar-builder-controls select, .avatar-builder-controls input { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #dce4e8; border-radius: 7px; background: #fff; color: #244452; }
+.avatar-builder-preview { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: #667b85; font-size: 12px; }
+.avatar-builder-preview img { width: 88px; height: 88px; border: 2px solid #f37021; border-radius: 50%; background: #fff4ec; }
+@media (max-width: 620px) { .avatar-builder-controls { grid-template-columns: 1fr; } }

@@ -1,0 +1,25 @@
+/* Four equal institutional color segments, unrelated to work status. */
+.stripe{background:linear-gradient(90deg,var(--gyn-navy,#003856) 0 25%,var(--gyn-orange,#f37021) 25% 50%,var(--gyn-green,#268c48) 50% 75%,var(--gyn-yellow,#fff200) 75% 100%)!important}
+.dkpi-num,.stat .number,.stat svg,.stat .kpi-link{color:#fff!important}
+.dkpi.navy{--k:#a9cbd9}.dkpi.cyan{--k:#007EFF}.dkpi.green{--k:#00DE94}.dkpi.orange{--k:#E35336}.dkpi.red{--k:#6B1025}
+.dkpi-num{font-size:clamp(1.5rem,2.1vw,2rem);line-height:1.18;overflow-wrap:break-word}
+.sidebar button.active,.sidebar button.active svg{color:#fff!important}.sidebar button.active{border-left-color:#78d2f3!important}
+.avatar,.avatar-circle{background:#dcebf2!important;color:#003856!important}
+.agenda-legend i{border:1px solid #9aa8b3;box-sizing:border-box}
+
+/* Light containers and dark blue labels throughout the content area. */
+.sidebar button.active,.sidebar button.active svg{color:#FFF200!important}.sidebar button.active{border-left-color:#FFF200!important}
+.panel,.panelhead,.stat,.dkpi,.visual-kpi,.project,.note,.tcard,.custom-section,.page-layout-toolbar,.custom-metric,.topic-kpi{background:#FFF!important;color:#002F47!important}
+.dkpi-num,.dkpi-label,.dkpi-sub,.stat .number,.stat .top,.stat .top span,.stat .foot,.stat .foot b,.stat small,.stat svg,.stat .kpi-link,.stat .kpi-subtext,.visual-kpi strong,.visual-kpi-head,.visual-kpi small,.panelhead h2,.panelhead h3,.panelhead p,.panelhead small,.panelhead>span{color:#002F47!important}
+.dkpi,.stat,.visual-kpi{border:1px solid #d5dfe5!important;box-shadow:0 2px 6px #002f470b!important}
+.dkpi-ico{background:#EDF3F7!important}.dkpi.navy{--k:#002F47}
+.stat .progress,.stat .bar,.dkpi-bar{background:#E5EDF2!important}
+.layout-toolbar-icon{background:#EDF3F7!important;color:#002F47!important}
+.page-container:has(#dashStatus){align-self:start}.page-container:has(#dashStatus)>.panel{height:auto!important}
+.dgrid:has(#dashStatus){align-items:start}
+.agenda-legend{font-size:12px!important;gap:10px 16px!important;line-height:1.65}
+.agenda-legend span{font-size:12px!important}.agenda-legend i{width:9px!important;height:9px!important}
+.compact-calendar .weekday{font-size:12px!important}.compact-calendar .agenda-day>b{font-size:12px!important}
+.compact-calendar .agenda-day>strong,.compact-calendar .agenda-day>small{font-size:11px!important}
+.day-statuses span,.day-statuses small{font-size:11px!important;line-height:1.5!important}
+@media(max-width:600px){.day-statuses span{font-size:10px!important}.agenda-legend{gap:8px 12px!important}}

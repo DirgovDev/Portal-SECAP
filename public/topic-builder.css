@@ -1,0 +1,442 @@
+.topic-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 17px 20px;
+  background: #fff;
+  border: 1px solid #dfe8ed;
+  border-radius: 9px;
+  margin: 0 0 23px;
+}
+.topic-toolbar-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: #3c657d;
+  margin-bottom: 6px;
+}
+.topic-toolbar small {
+  display: block;
+  font-size: 10px;
+  color: #8a9fab;
+  line-height: 1.6;
+}
+.topic-toolbar .btn {
+  font-size: 10px;
+  min-height: 34px;
+  padding: 9px 12px;
+}
+.topic-toolbar .actions {
+  flex-shrink: 0;
+}
+.topic-designer-selector {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 21px 23px;
+  background: #eaf2f7;
+  border: 1px solid #d8e5ed;
+  border-radius: 10px;
+  margin-bottom: 25px;
+}
+.topic-designer-selector label {
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.topic-designer-selector select {
+  min-width: 220px;
+  font-size: 12px;
+}
+.topic-designer-selector > span {
+  font-size: 11px;
+  color: #7995a5;
+  line-height: 1.7;
+  flex: 1;
+}
+.topic-designer-selector .btn {
+  font-size: 10px;
+}
+.topic-board {
+  display: flex;
+  gap: 17px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  max-width: 100%;
+}
+.topic-board-column {
+  min-width: 255px;
+  width: 290px;
+  max-width: 340px;
+  flex: 1 0 255px;
+  border: 1px solid #dce7ed;
+  border-top: 3px solid #7d9faf;
+  border-radius: 9px;
+  background: #edf3f6;
+  padding: 13px;
+}
+.topic-board-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: start;
+  padding: 5px 3px 16px;
+}
+.topic-board-heading h3 {
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 0;
+  color: #3e6c85;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.topic-board-heading > span {
+  padding: 3px 6px;
+  font-size: 10px;
+  color: #698a9e;
+  background: #dfeaf0;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.topic-board-card {
+  background: #fff;
+  border: 1px solid #dce5eb;
+  border-radius: 7px;
+  padding: 17px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 5px #00385604;
+}
+.topic-board-card > .project-link {
+  font-size: 12px;
+  line-height: 1.65;
+  margin-bottom: 12px;
+}
+.topic-card-field {
+  margin: 11px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid #f0f4f6;
+}
+.topic-card-field small {
+  font-size: 8px;
+  color: #94a7b1;
+  letter-spacing: 0.4px;
+  display: block;
+  margin-bottom: 5px;
+}
+.topic-card-field span {
+  font-size: 10px;
+  color: #658497;
+  line-height: 1.7;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.no-information {
+  color: #a3b2ba !important;
+  font-size: 10px;
+}
+.topic-data-panel {
+  margin-bottom: 22px;
+}
+.topic-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 21px;
+  margin-bottom: 23px;
+}
+.topic-summary-record {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  width: 100%;
+  font-size: 11px;
+  color: #557d93;
+  line-height: 1.7;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf2f5;
+  text-align: left;
+}
+.topic-summary-record svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.topic-custom-visuals {
+  margin-top: 25px;
+}
+.dimension-picker {
+  margin-bottom: 21px;
+}
+.dimension-picker > label {
+  font-size: 11px;
+  color: #416c85;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+.dimension-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 13px;
+  background: #f3f7f9;
+  border: 1px solid #e0e9ef;
+  border-radius: 7px;
+  min-height: 53px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.dimension-pill {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: white;
+  border: 1px solid #cfdee7;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 11px;
+  color: #567d93;
+}
+.dimension-pill b {
+  font-size: 10px;
+  font-weight: 550;
+}
+.dimension-order {
+  background: #e8f1f7;
+  color: #7698ab;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+}
+.dimension-pill button {
+  padding: 1px;
+  display: inline-flex;
+  align-items: center;
+  color: #8ca5b4;
+  font-size: 12px;
+}
+.dimension-pill button svg {
+  width: 11px;
+  height: 11px;
+}
+.dimension-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dimension-add select {
+  min-width: 0;
+  flex: 1;
+  font-size: 11px;
+  padding: 9px 10px;
+  width: 100%;
+}
+.dimension-add .btn {
+  font-size: 10px;
+  padding: 9px 12px;
+  min-height: 34px;
+}
+.dimension-picker > small {
+  display: block;
+  color: #92a8b4;
+  font-size: 9px;
+  line-height: 1.7;
+  margin-top: 9px;
+}
+.compound-example {
+  display: flex;
+  gap: 12px;
+  padding: 17px 18px;
+  background: #eaf3f8;
+  border: 1px solid #dce8ef;
+  border-radius: 7px;
+  margin: 17px 0 22px;
+}
+.compound-example > svg {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  color: #7d9fb2;
+  flex-shrink: 0;
+}
+.compound-example b {
+  font-size: 11px;
+  color: #65899e;
+}
+.compound-example p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #7b98a9;
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+}
+.topic-fields-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px 20px;
+  padding: 17px;
+  border: 1px solid #dfe8ed;
+  border-radius: 7px;
+  max-height: 270px;
+  overflow: auto;
+  background: #fbfcfd;
+}
+.topic-fields-list label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 400;
+  font-size: 11px;
+  color: #6d8a9c;
+  margin: 0;
+  line-height: 1.6;
+}
+.topic-fields-list input {
+  flex-shrink: 0;
+}
+.chart-editor-layout .dimension-picker {
+  margin-bottom: 20px;
+}
+.chart-editor-layout .dimension-add .btn {
+  font-size: 9px;
+  padding: 9px;
+}
+.chart-editor-layout .dimension-add select {
+  font-size: 10px;
+}
+.chart-editor-layout .dimension-pills {
+  padding: 10px;
+}
+.chart-editor-layout .dimension-pill {
+  gap: 6px;
+  font-size: 9px;
+}
+.chart-editor-layout .dimension-pill b {
+  font-size: 9px;
+}
+.chart-editor-layout #seriesField > small {
+  display: none;
+}
+.chart-editor-layout #seriesField > label {
+  display: none;
+}
+.high .topic-toolbar,
+.high .topic-board-card,
+.high .topic-summary-grid .panel {
+  background: #172b37;
+}
+.high .topic-board-column,
+.high .topic-designer-selector,
+.high .dimension-pills,
+.high .compound-example {
+  background: #203d50;
+}
+.high .dimension-pill,
+.high .topic-fields-list {
+  background: #172b37;
+}
+.high .topic-toolbar-label,
+.high .topic-board-heading h3,
+.high .dimension-pill b {
+  color: #d3e5ed;
+}
+@media (max-width: 1050px) {
+  .topic-toolbar {
+    align-items: start;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .topic-toolbar .actions {
+    margin-left: auto;
+  }
+  .topic-designer-selector {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .topic-designer-selector > span {
+    min-width: 160px;
+  }
+  .topic-designer-selector .btn {
+    margin-left: auto;
+  }
+  .topic-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .topic-toolbar {
+    padding: 15px 16px;
+  }
+  .topic-toolbar .actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .topic-toolbar-label {
+    font-size: 12px;
+  }
+  .topic-toolbar small {
+    font-size: 9px;
+  }
+  .topic-toolbar .btn {
+    font-size: 9px;
+    padding: 8px 10px;
+    min-height: 32px;
+  }
+  .topic-board-column {
+    min-width: 245px;
+    flex-basis: 245px;
+  }
+  .topic-board-heading h3 {
+    font-size: 11px;
+  }
+  .topic-designer-selector {
+    padding: 18px;
+    display: block;
+  }
+  .topic-designer-selector > span {
+    display: block;
+    font-size: 10px;
+    margin: 14px 0;
+  }
+  .topic-designer-selector select {
+    width: 100%;
+    min-width: 0;
+  }
+  .topic-designer-selector .btn {
+    font-size: 10px;
+  }
+  .topic-fields-list {
+    grid-template-columns: 1fr;
+    max-height: 240px;
+    padding: 15px;
+  }
+  .dimension-picker > label {
+    font-size: 10px;
+  }
+  .dimension-add .btn {
+    font-size: 9px;
+    padding: 8px 10px;
+  }
+  .dimension-add select {
+    font-size: 10px;
+  }
+  .dimension-pill b {
+    font-size: 9px;
+  }
+  .dimension-pill {
+    padding: 6px;
+    gap: 6px;
+  }
+  .compound-example p {
+    font-size: 10px;
+  }
+  .compound-example b {
+    font-size: 10px;
+  }
+  .topic-toolbar .iconbtn svg {
+    width: 15px;
+    height: 15px;
+  }
+}
