@@ -234,7 +234,8 @@ function persist(action, where, before = '', after = '') {
       before,
       after,
     });
-  if (window.SECAP_AUTH) queueSave(db);
+  if (window.SECAP_AUTH) return queueSave(db);
+  return Promise.resolve(true);
 }
 
 let toastTimer = null;
@@ -1689,11 +1690,9 @@ function projectView() {
       esc(p.name),
       esc(p.description),
       btn('Exportar', `openExport('${p.id}')`, 'download') +
-        (canEdit(p)
-          ? btn('Importar', `openImport('${p.id}')`, 'upload') +
-            btn('Personalizar campos', `editFields('${p.id}')`, 'edit') +
-            btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary')
-          : '')
+        (isSysAdmin() && canEdit(p) ? btn('Importar', `openImport('${p.id}')`, 'upload') : '') +
+        (isSysAdmin() ? btn('Personalizar campos', `editFields('${p.id}')`, 'edit') : '') +
+        (canEdit(p) ? btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary') : '')
     ) +
     `<div class="stats">${stat(
       'OBRAS CADASTRADAS',
@@ -1912,11 +1911,25 @@ function kanban() {
   );
 }
 
+// Permissão por campo definida pelo administrador (Administração > Permissões por campo).
+// Sem fid: pergunta se o usuário tem ao menos um campo liberado no projeto.
+function memberFieldAllowed(pid, fid) {
+  if (typeof getAllowedFieldsForCurrentUser !== 'function') return isSysAdmin();
+  const allowed = getAllowedFieldsForCurrentUser(pid);
+  if (allowed === null) return true;
+  return fid == null ? allowed.length > 0 : allowed.includes(String(fid));
+}
+
 function moveRecord(pid, rid, val) {
   const p = db.projects.find((p) => p.id === pid);
   if (!p || !canEdit(p)) return notify('Edição não permitida.');
   const f = p.fields.find((f) => f.id === kanbanField);
   if (!f?.options.includes(val)) return notify('Essa opção não existe neste projeto.');
+  if (!memberFieldAllowed(pid, kanbanField))
+    return notify(
+      `Você não tem permissão para alterar o campo "${f.name}" neste projeto.`,
+      'error'
+    );
   const r = p.records.find((r) => r.id === rid),
     before = r[kanbanField];
   r[kanbanField] = val;
@@ -2317,6 +2330,19 @@ function obrasAccessControl(item) {
   </label>`;
 }
 
+// Botão de promover/rebaixar. A própria conta não pode se alterar (o banco também recusa).
+function roleControl(item) {
+  const id = Number(item.id);
+  const mine =
+    String(item.email || '').toLowerCase() === String(window.SECAP_EMAIL || '').toLowerCase();
+  if (item.profile_role === 'administrador') {
+    return mine
+      ? '<span class="role-note">Sua conta</span>'
+      : `<button type="button" class="btn sm role-btn is-demote" onclick="openUserRole(${id}, 'usuario')">Remover administração</button>`;
+  }
+  return `<button type="button" class="btn sm role-btn is-promote" onclick="openUserRole(${id}, 'administrador')">Tornar administrador</button>`;
+}
+
 function renderAccountRequests() {
   const root = document.getElementById('accountRequests');
   if (!root) return;
@@ -2347,9 +2373,13 @@ function renderAccountRequests() {
     (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'usuario'
   );
   const canEditCount = approvedUsers.filter((item) => item.obras_access === 'editar').length;
-  const approvedSummary = approvedUsers.length
-    ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
-    : 'Acesso aprovado';
+  const adminCount = requests.filter(
+    (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'administrador'
+  ).length;
+  const approvedSummary =
+    (approvedUsers.length
+      ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
+      : 'Acesso aprovado') + (adminCount ? ` · ${adminCount} administrador(es)` : '');
 
   const dateLabel = (value) => {
     if (!value) return '—';
@@ -2397,8 +2427,10 @@ function renderAccountRequests() {
         pending
           ? `<button type="button" class="btn primary sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'approve')">Aprovar</button><button type="button" class="btn danger sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'reject')">Recusar</button>`
           : status === 'aprovada' && item.profile_role === 'usuario'
-            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}</div>`
-            : ''
+            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}${roleControl(item)}</div>`
+            : status === 'aprovada' && item.profile_role === 'administrador'
+              ? `<div class="access-controls-pair"><span class="role-badge">Administrador</span>${roleControl(item)}</div>`
+              : ''
       }</div>
     </article>`;
     })
@@ -2737,6 +2769,10 @@ const typeNames = {
 };
 
 function editFields(pid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2778,6 +2814,10 @@ function editFields(pid) {
 }
 
 function fieldForm(pid, fid = '') {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid),
     f = p.fields.find((f) => f.id === fid);
   modal(
@@ -2805,6 +2845,10 @@ function fieldForm(pid, fid = '') {
 }
 
 function saveField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   const data = new FormData($('#fieldForm')),
@@ -2838,6 +2882,10 @@ function saveField(pid, fid) {
 }
 
 function removeField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2988,25 +3036,55 @@ function closeFullscreenDetail() {
 function saveRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
+
+  const allowed =
+    typeof getAllowedFieldsForCurrentUser === 'function'
+      ? getAllowedFieldsForCurrentUser(p.id)
+      : isSysAdmin()
+        ? null
+        : [];
+
+  if (allowed !== null && (!Array.isArray(allowed) || allowed.length === 0)) {
+    return notify('Você não possui campos liberados para edição neste projeto.');
+  }
+
   const data = new FormData($('#recordForm')),
     r = p.records.find((r) => r.id === rid),
     values = {};
+
   for (const f of p.fields) {
+    const isFieldAllowed = allowed === null || allowed.includes(f.id);
+
+    // Se o campo estiver bloqueado para este usuário:
+    // - Na edição (r existe), preserva o valor original do banco (evita apagar dado de input disabled ou burlado)
+    // - Na criação de novo registro, grava vazio
+    if (!isFieldAllowed) {
+      values[f.id] = r ? (r[f.id] ?? '') : '';
+      continue;
+    }
+
     const value = data.get(f.id);
     values[f.id] = ['currency', 'number'].includes(f.type)
-      ? value === ''
+      ? value === '' || value === null
         ? ''
         : Number(value)
       : String(value || '').trim();
   }
+
   if (r) {
-    const changes = p.fields.filter((f) => String(r[f.id] ?? '') !== String(values[f.id] ?? ''));
+    const changes = p.fields.filter(
+      (f) =>
+        (allowed === null || allowed.includes(f.id)) &&
+        String(r[f.id] ?? '') !== String(values[f.id] ?? '')
+    );
+
     changes.forEach((f) => {
       const old = r[f.id];
       r[f.id] = values[f.id];
       persist(`Alterou ${f.name}`, p, String(old ?? ''), String(values[f.id] ?? ''));
     });
-    if (window.SECAP_OBRAS_BACKEND) {
+
+    if (window.SECAP_OBRAS_BACKEND && changes.length > 0) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, r);
     }
   } else {
@@ -3017,12 +3095,15 @@ function saveRecord(pid, rid) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, newRecord);
     }
   }
+
   closeModal();
   render();
   notify('Obra salva. Calendário, Kanban e BI atualizados.');
 }
 
 function deleteRecord(pid, rid) {
+  if (!memberFieldAllowed(pid))
+    return notify('Você não possui campos liberados para editar este projeto.', 'error');
   modal(
     'Excluir esta obra?',
     `<p>A obra será removida do portal e de todos os painéis conectados.</p>`,
@@ -3033,7 +3114,7 @@ function deleteRecord(pid, rid) {
 
 async function confirmDeleteRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
-  if (!p || !canEdit(p)) return;
+  if (!p || !canEdit(p) || !memberFieldAllowed(pid)) return;
   const r = p.records.find((r) => r.id === rid);
   // Primeiro o banco: só tira a obra da tela se a exclusão realmente foi aceita.
   if (window.SECAP_OBRAS_BACKEND) {

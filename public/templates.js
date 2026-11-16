@@ -1157,13 +1157,20 @@ function addBlankProjectField() {
   const host = $('#blankCustomFields');
   if (!host) return;
   const key = `blank_${++blankProjectFieldCounter}`;
-  host.insertAdjacentHTML('beforeend', `<div class="fieldrow blank-field-row" data-field-key="${key}" style="display:block;padding:12px 0;border-bottom:1px solid var(--line,#e5e7eb)">
+  host.insertAdjacentHTML(
+    'beforeend',
+    `<div class="fieldrow blank-field-row" data-field-key="${key}" style="display:block;padding:12px 0;border-bottom:1px solid var(--line,#e5e7eb)">
     <div class="twocol"><div class="field"><label>Nome do campo *</label><input data-custom-name required placeholder="Ex.: Número do contrato"></div>
-    <div class="field"><label>Tipo de informação</label><select data-custom-type onchange="this.closest('.blank-field-row').querySelector('[data-custom-options]').style.display=this.value==='select'?'block':'none'">${Object.entries(typeNames).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Tipo de informação</label><select data-custom-type onchange="this.closest('.blank-field-row').querySelector('[data-custom-options]').style.display=this.value==='select'?'block':'none'">${Object.entries(
+      typeNames
+    )
+      .map(([k, v]) => `<option value="${k}">${v}</option>`)
+      .join('')}</select></div></div>
     <div class="field" data-custom-options style="display:none"><label>Opções (separadas por vírgula)</label><input data-custom-list placeholder="Planejamento, Em execução, Concluída"></div>
     <div class="twocol"><div class="field"><label>Orientação de preenchimento</label><input data-custom-help placeholder="Explique o que deve ser informado"></div><label style="align-self:center"><input data-custom-required type="checkbox"> Obrigatório</label></div>
     <button class="btn danger small" type="button" onclick="this.closest('.blank-field-row').remove()">${icon('trash')} Remover campo</button>
-  </div>`);
+  </div>`
+  );
 }
 
 function saveBlankProject() {
@@ -1179,10 +1186,21 @@ function saveBlankProject() {
   for (const row of customRows) {
     const fieldName = row.querySelector('[data-custom-name]').value.trim();
     const type = row.querySelector('[data-custom-type]').value;
-    const options = (row.querySelector('[data-custom-list]')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
+    const options = (row.querySelector('[data-custom-list]')?.value || '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
     if (!fieldName) return notify('Informe o nome de todos os campos personalizados.');
-    if (type === 'select' && !options.length) return notify(`Informe as opções do campo "${fieldName}".`);
-    fields.push({ id: 'f_' + uid(), name: fieldName, type, options: type === 'select' ? [...new Set(options)] : undefined, help: row.querySelector('[data-custom-help]').value.trim(), required: row.querySelector('[data-custom-required]').checked });
+    if (type === 'select' && !options.length)
+      return notify(`Informe as opções do campo "${fieldName}".`);
+    fields.push({
+      id: 'f_' + uid(),
+      name: fieldName,
+      type,
+      options: type === 'select' ? [...new Set(options)] : undefined,
+      help: row.querySelector('[data-custom-help]').value.trim(),
+      required: row.querySelector('[data-custom-required]').checked,
+    });
   }
   const p = {
     id: uid(),
@@ -1199,7 +1217,9 @@ function saveBlankProject() {
   persist('Criou projeto do zero', p, '', name);
   closeModal();
   go('projects', p.id);
-  notify(`Projeto criado com ${Math.max(0, p.fields.length - 1)} campo(s) personalizado(s). Cada obra poderá preencher esses dados.`);
+  notify(
+    `Projeto criado com ${Math.max(0, p.fields.length - 1)} campo(s) personalizado(s). Cada obra poderá preencher esses dados.`
+  );
 }
 
 function newProjectFromTemplate(key) {
@@ -1231,7 +1251,7 @@ function saveGuidedProject(key) {
       records: [],
       biTemplate: t.bi,
       managementTemplate: key,
-      entityKind:t.entityKind||'work',
+      entityKind: t.entityKind || 'work',
       biMapping: {
         status: 'status',
         stage: key === 'recursos' ? 'etapa_captacao' : 'etapa',
@@ -1255,6 +1275,41 @@ function saveGuidedProject(key) {
   notify('Pasta criada com campos organizados e BI conectado.');
 }
 
+// Paleta de cores por assunto/seção (com suporte a cores personalizadas do projeto)
+function getGroupTheme(groupName, project = null) {
+  const defaultThemes = {
+    Essenciais: { color: '#f37021', bg: 'rgba(243, 112, 33, 0.12)' },
+    Localização: { color: '#003856', bg: 'rgba(0, 56, 86, 0.10)' },
+    'Prazos e marcos': { color: '#00a3d7', bg: 'rgba(0, 163, 215, 0.12)' },
+    Financeiro: { color: '#268c48', bg: 'rgba(38, 140, 72, 0.12)' },
+    'Recursos e instrumentos': { color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.10)' },
+    Acompanhamento: { color: '#d97706', bg: 'rgba(217, 119, 6, 0.12)' },
+    Documentação: { color: '#0d9488', bg: 'rgba(13, 148, 136, 0.12)' },
+  };
+
+  const base = defaultThemes[groupName] || { color: '#475569', bg: 'rgba(71, 85, 105, 0.10)' };
+
+  // Se o projeto tiver uma cor personalizada salva para este grupo, utilize-a
+  if (project && project.groupColors && project.groupColors[groupName]) {
+    const customColor = project.groupColors[groupName];
+    return { color: customColor, bg: hexToRgba(customColor, 0.12) };
+  }
+
+  return base;
+}
+
+// Função auxiliar para converter HEX em RGBA para o fundo translúcido
+function hexToRgba(hex, alpha) {
+  let c = hex.replace('#', '');
+  if (c.length === 3)
+    c = c
+      .split('')
+      .map((x) => x + x)
+      .join('');
+  const num = parseInt(c, 16);
+  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+}
+
 // Substituição da função editRecord para abrir em Tela Cheia Real
 editRecord = function (pid, rid = '') {
   const p = visible().find((p) => p.id === pid);
@@ -1262,13 +1317,11 @@ editRecord = function (pid, rid = '') {
   const r = p.records.find((r) => r.id === rid);
   const edit = canEdit(p);
 
-  // Se for nova obra (sem registo), abre o formulário de inserção
   if (!r) {
     openRecordForm(pid, rid);
     return;
   }
 
-  // Garante que não ficam visões anteriores abertas
   closeFullscreenDetail();
 
   const fields = p.fields;
@@ -1276,7 +1329,6 @@ editRecord = function (pid, rid = '') {
     a === 'Essenciais' ? -1 : b === 'Essenciais' ? 1 : 0
   );
 
-  // Cria a estrutura em Tela Cheia anexada diretamente ao body
   const detailContainer = document.createElement('div');
   detailContainer.id = 'fullscreenDetailView';
   detailContainer.className = 'fullscreen-detail-page';
@@ -1317,16 +1369,17 @@ editRecord = function (pid, rid = '') {
         </div>
       </div>
 
-     <!-- Exibição de todos os campos organizados por grupo com ícone e linha laranja -->
+     <!-- Seções organizadas por assunto, cada uma com sua própria cor -->
       ${groups
         .map((g) => {
           const groupFields = fields.filter((f) => (f.group || 'Outras informações') === g);
+          const theme = getGroupTheme(g);
           return `
-          <div class="section-group-header">
+          <div class="section-group-header" style="--sec-color: ${theme.color}; --sec-bg: ${theme.bg}; --sec-border: ${theme.border};">
             <h2>${icon(getGroupIcon(g))} ${esc(g)}</h2>
             <span class="count-badge">${groupFields.length} campos</span>
           </div>
-          <div class="detail-grid">
+          <div class="detail-grid" style="--sec-color: ${theme.color};">
             ${groupFields
               .map((f) => {
                 const val = r[f.id];
@@ -1352,16 +1405,16 @@ editRecord = function (pid, rid = '') {
 
   document.body.appendChild(detailContainer);
 };
-// Mapeamento de ícones por nome de grupo/assunto
+// Mapeamento de ícones por nome de grupo/assunto (usando os ícones nativos do sistema)
 function getGroupIcon(groupName) {
   const icons = {
-    Essenciais: 'star',
-    Localização: 'map-pin',
-    'Prazos e marcos': 'calendar',
-    Financeiro: 'dollar-sign',
-    'Recursos e instrumentos': 'briefcase',
-    Acompanhamento: 'activity',
-    Documentação: 'file-text',
+    Essenciais: 'shield',
+    Localização: 'eye',
+    'Prazos e marcos': 'alert',
+    Financeiro: 'money',
+    'Recursos e instrumentos': 'folder',
+    Acompanhamento: 'chart',
+    Documentação: 'file',
   };
   return icons[groupName] || 'folder';
 }
@@ -1372,20 +1425,49 @@ function openRecordForm(pid, rid = '') {
 
   const r = (p.records || []).find((record) => record.id === rid);
   const edit = canEdit(p);
-  const groups = [...new Set((p.fields || []).map((field) => field.group || 'Outras informações'))]
-    .sort((a, b) => (a === 'Essenciais' ? -1 : b === 'Essenciais' ? 1 : 0));
+  const allowed =
+    typeof getAllowedFieldsForCurrentUser === 'function'
+      ? getAllowedFieldsForCurrentUser(p.id)
+      : isSysAdmin()
+        ? null
+        : [];
+  const canEditAnyField = edit && (allowed === null || allowed.length > 0);
+  const groups = [
+    ...new Set((p.fields || []).map((field) => field.group || 'Outras informações')),
+  ].sort((a, b) => (a === 'Essenciais' ? -1 : b === 'Essenciais' ? 1 : 0));
 
   const fieldMarkup = groups.length
-    ? groups.map((group, index) => {
-        const fields = p.fields.filter((field) => (field.group || 'Outras informações') === group);
-        return `
-          <section class="edit-section-group">
-            ${group !== 'Essenciais' ? `<h3 class="edit-section-title">${esc(group)}</h3>` : ''}
+    ? groups
+        .map((group, index) => {
+          const fields = p.fields.filter(
+            (field) => (field.group || 'Outras informações') === group
+          );
+          const theme = getGroupTheme(group);
+          return `
+          <section class="edit-section-group" style="margin-bottom: 32px;">
+            <div class="section-group-header" style="--sec-color: ${theme.color};">
+              <h2 style="color: ${theme.color}; display: flex; align-items: center; gap: 10px;">
+                ${icon(getGroupIcon(group))} ${esc(group)}
+              </h2>
+              <span class="count-badge" style="background-color: ${theme.bg}; color: ${theme.color}; border: 1px solid ${theme.color};">${fields.length} campos</span>
+            </div>
             <div class="edit-cards-grid">
-              ${fields.map((field) => inputField(field, r?.[field.id], !edit)).join('')}
+              ${fields
+                .map((field) => {
+                  const fieldAllowed =
+                    edit && (allowed === null || allowed.includes(String(field.id)));
+                  const htmlField = inputField(field, r?.[field.id], !fieldAllowed);
+                  // Mantém o card com borda cinza sutil e o destaque colorido apenas no topo
+                  return htmlField.replace(
+                    'class="field"',
+                    `class="field" style="border: 1px solid #e2e8f0 !important; border-top: 3.5px solid ${theme.color} !important;"`
+                  );
+                })
+                .join('')}
             </div>
           </section>`;
-      }).join('')
+        })
+        .join('')
     : '<p class="subtitle">Este projeto ainda não possui campos cadastrados.</p>';
 
   modal(
@@ -1393,18 +1475,22 @@ function openRecordForm(pid, rid = '') {
     `<div class="record-form-intro">
        <p class="subtitle">${esc(p.name)}</p>
        <p class="metric-note">Preencha os mesmos campos e tipos de informação disponíveis no cadastro. Os valores atuais foram carregados para edição.</p>
+        <button class="btn secondary small" type="button" onclick="openEditSectionColorsModal('${pid}', '${rid}')">
+           ${icon('edit')} Editar cores das seções
+        </button>
      </div>
+     ${allowed !== null && canEditAnyField ? '<div class="perm-legend" aria-label="Legenda dos campos"><span class="perm-legend-item is-editable"><i></i>Campos que você pode editar</span><span class="perm-legend-item is-readonly"><i></i>Campos somente leitura</span></div>' : ''}
+     ${!canEditAnyField ? '<div class="summary-strip"><p><strong>Nenhum campo liberado para edição.</strong> Solicite ao administrador que configure suas permissões para este projeto.</p></div>' : ''}
      <form id="recordForm" onsubmit="event.preventDefault();saveRecord('${pid}','${rid}')" style="padding-top:10px;">
        ${fieldMarkup}
      </form>`,
     (edit && r ? btn('Excluir', `deleteRecord('${pid}','${rid}')`, 'trash') : '') +
       btn('Cancelar', r ? `editRecord('${pid}','${rid}')` : 'closeModal()', 'arrow') +
-      (edit
+      (canEditAnyField
         ? `<button class="btn primary" form="recordForm" type="submit">${icon('check')} ${r ? 'Salvar alterações' : 'Cadastrar obra'}</button>`
         : '')
   );
 }
-
 // Qualidade e funções analíticas do BI
 function projectQuality(p, rs) {
   const issues = [],
@@ -1601,6 +1687,834 @@ biFinance = function (p, rs) {
   if (extras.length)
     html += `<div class="stats" style="margin-top:23px;grid-template-columns:repeat(2,1fr)">${extras.map((f) => biMetric(f.name.toUpperCase(), semanticMoney(directTotal(rs, f.id)), 'Medida informada separadamente', 'money')).join('')}</div>`;
   return html;
+};
+// Abre o modal para o usuário escolher as cores de cada seção do projeto
+function openEditSectionColorsModal(pid, rid = '') {
+  const p = visible().find((project) => project.id === pid);
+  if (!p) return;
+
+  const fields = p.fields || [];
+  const groups = [...new Set(fields.map((field) => field.group || 'Outras informações'))];
+
+  const colorRows = groups
+    .map((group) => {
+      const currentTheme = getGroupTheme(group, p);
+      // Substituímos espaços e caracteres especiais no nome do input para evitar erros no formulário
+      const safeKey = group.replace(/[^a-zA-Z0-9]/g, '_');
+      return `
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <span style="font-weight: 600; color: #003856; font-size: 13px;">${esc(group)}</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <input type="color" data-group-name="${esc(group)}" name="color_${safeKey}" value="${currentTheme.color}" style="width: 45px; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; background: transparent;">
+          <span style="font-size: 11px; color: #64748b;">Escolher cor</span>
+        </div>
+      </div>
+    `;
+    })
+    .join('');
+
+  modal(
+    'Editar cores das seções',
+    `<form id="sectionColorsForm" onsubmit="event.preventDefault(); saveSectionColors('${pid}', '${rid}');">
+       <p class="subtitle">Personalize a identidade visual de cada seção deste projeto.</p>
+       <div style="margin-top: 18px;">
+         ${colorRows}
+       </div>
+     </form>`,
+    btn('Cancelar', 'closeModal()', 'close') +
+      `<button class="btn primary" form="sectionColorsForm" type="submit">${icon('check')} Salvar cores</button>`
+  );
+}
+
+// Salva as cores no projeto e aguarda a confirmação da gravação antes de voltar ao formulário.
+async function saveSectionColors(pid, rid = '') {
+  const p = db.projects.find((project) => String(project.id) === String(pid));
+  const form = document.getElementById('sectionColorsForm');
+  if (!p || !form) {
+    if (typeof notify === 'function')
+      notify('Não foi possível localizar o projeto ou o formulário de cores.', 'error');
+    return;
+  }
+
+  const colorInputs = form.querySelectorAll('input[type="color"][data-group-name]');
+  if (!colorInputs.length) {
+    if (typeof notify === 'function') notify('Nenhuma cor foi encontrada para salvar.', 'error');
+    return;
+  }
+
+  const nextColors = { ...(p.groupColors || {}) };
+  colorInputs.forEach((input) => {
+    const groupName = input.getAttribute('data-group-name');
+    if (groupName) nextColors[groupName] = input.value;
+  });
+
+  // Atualiza o objeto original do banco local antes de iniciar a persistência.
+  p.groupColors = nextColors;
+  const saveResult = persist('Atualizou as cores das seções do projeto', p, '', p.name);
+
+  // queueSave/persist passam a retornar a promessa de gravação quando a nuvem está ativa.
+  if (saveResult && typeof saveResult.then === 'function') {
+    const saved = await saveResult;
+    if (saved === false) return;
+  }
+
+  closeModal();
+  if (rid) openRecordForm(pid, rid);
+  else render();
+
+  if (typeof notify === 'function') {
+    notify('Cores das seções salvas e atualizadas com sucesso!');
+  }
+}
+/* ============================================================================
+   GERENCIAMENTO DE SEÇÕES E CAMPOS POR SEÇÃO COM DRAG-AND-DROP ENTRE SEÇÕES
+   ============================================================================ */
+
+function getProjectSections(p) {
+  const fields = p?.fields || [];
+  const rawGroups = [...new Set(fields.map((f) => f.group || 'Outras informações'))];
+  const savedOrder = Array.isArray(p?.groupOrder) ? p.groupOrder : [];
+
+  return rawGroups.sort((a, b) => {
+    const idxA = savedOrder.indexOf(a);
+    const idxB = savedOrder.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    if (a === 'Essenciais') return -1;
+    if (b === 'Essenciais') return 1;
+    return a.localeCompare(b, 'pt-BR');
+  });
+}
+
+const PROTECTED_SYSTEM_FIELDS = new Set([
+  'nome',
+  'status',
+  'etapa',
+  'valor',
+  'executado',
+  'prazo',
+  'progresso',
+  'responsavel',
+  'orgao',
+  'proxima',
+]);
+
+let secapDragState = {
+  type: '', // 'section' | 'field'
+  id: '', // nome da seção ou id do campo
+  section: '',
+};
+
+function clearSecapDragHighlights() {
+  document.querySelectorAll('[data-sec-card]').forEach((c) => {
+    c.style.boxShadow = '';
+    c.style.outline = '';
+  });
+  document.querySelectorAll('[data-field-row]').forEach((r) => {
+    r.style.borderTop = '';
+  });
+}
+
+// --- DRAG AND DROP DE SEÇÕES ---
+function secapSectionDragStart(e, sectionName) {
+  secapDragState = { type: 'section', id: sectionName, section: sectionName };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', 'section:' + sectionName);
+  const card = e.currentTarget;
+  setTimeout(() => {
+    card.style.opacity = '0.5';
+  }, 0);
+}
+
+function secapSectionDragEnd(el) {
+  secapDragState = { type: '', id: '', section: '' };
+  el.style.opacity = '1';
+  clearSecapDragHighlights();
+}
+
+function secapSectionDragOver(e, targetSection) {
+  if (!secapDragState.type) return;
+
+  // Caso 1: Reordenando uma seção inteira
+  if (secapDragState.type === 'section') {
+    if (secapDragState.id === targetSection) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.style.boxShadow = '0 -3px 0 0 #f37021';
+    return;
+  }
+
+  // Caso 2: Arrastando um campo para dentro desta seção (mesmo que de outra seção)
+  if (secapDragState.type === 'field' && secapDragState.section !== targetSection) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.style.outline = '2px dashed #f37021';
+  }
+}
+
+function secapSectionDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.style.boxShadow = '';
+    e.currentTarget.style.outline = '';
+  }
+}
+
+function secapSectionDrop(e, pid, targetSection) {
+  e.preventDefault();
+  clearSecapDragHighlights();
+
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  // Soltou uma SEÇÃO sobre outra seção
+  if (secapDragState.type === 'section') {
+    if (!secapDragState.id || secapDragState.id === targetSection) return;
+    const sections = getProjectSections(p);
+    const fromIdx = sections.indexOf(secapDragState.id);
+    const toIdx = sections.indexOf(targetSection);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const [moved] = sections.splice(fromIdx, 1);
+    sections.splice(toIdx, 0, moved);
+    p.groupOrder = sections;
+
+    persist('Reordenou seções', p, '', sections.join(' → '));
+    editFields(pid, moved);
+    render();
+    notify('Ordem das seções atualizada.');
+    return;
+  }
+
+  // Soltou um CAMPO diretamente na área da seção de destino (vai para o final dela)
+  if (secapDragState.type === 'field' && secapDragState.id) {
+    const fieldIdx = p.fields.findIndex((f) => f.id === secapDragState.id);
+    if (fieldIdx < 0) return;
+
+    const [movedField] = p.fields.splice(fieldIdx, 1);
+    const oldSection = movedField.group || 'Outras informações';
+    movedField.group = targetSection;
+    p.fields.push(movedField);
+
+    persist(
+      'Moveu campo de seção',
+      p,
+      `${movedField.name} (${oldSection})`,
+      `${movedField.name} (${targetSection})`
+    );
+    editFields(pid, targetSection);
+    render();
+    notify(`Campo "${movedField.name}" movido para "${targetSection}".`);
+  }
+}
+
+// --- DRAG AND DROP DE CAMPOS (MESMA SEÇÃO OU ENTRE SEÇÕES) ---
+function secapFieldDragStart(e, fid, sectionName) {
+  e.stopPropagation();
+  secapDragState = { type: 'field', id: fid, section: sectionName };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', 'field:' + fid);
+  const row = e.currentTarget;
+  setTimeout(() => {
+    row.style.opacity = '0.45';
+  }, 0);
+}
+
+function secapFieldDragEnd(e, el) {
+  e.stopPropagation();
+  secapDragState = { type: '', id: '', section: '' };
+  el.style.opacity = '1';
+  clearSecapDragHighlights();
+}
+
+function secapFieldDragOver(e, targetFid, targetSection) {
+  if (secapDragState.type !== 'field' || secapDragState.id === targetFid) return;
+  e.preventDefault();
+  e.stopPropagation();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.borderTop = '2.5px solid #f37021';
+
+  const parentCard = e.currentTarget.closest('[data-sec-card]');
+  if (parentCard && secapDragState.section !== targetSection) {
+    parentCard.style.outline = '2px dashed #f37021';
+  }
+}
+
+function secapFieldDragLeave(e) {
+  e.stopPropagation();
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.style.borderTop = '';
+  }
+}
+
+function secapFieldDrop(e, pid, targetFid, targetSection) {
+  e.preventDefault();
+  e.stopPropagation();
+  clearSecapDragHighlights();
+
+  if (secapDragState.type !== 'field' || !secapDragState.id || secapDragState.id === targetFid) {
+    return;
+  }
+
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  const fromIdx = p.fields.findIndex((f) => f.id === secapDragState.id);
+  if (fromIdx < 0) return;
+
+  const [movedField] = p.fields.splice(fromIdx, 1);
+  const oldSection = movedField.group || 'Outras informações';
+  movedField.group = targetSection;
+
+  const toIdx = p.fields.findIndex((f) => f.id === targetFid);
+  if (toIdx < 0) {
+    p.fields.push(movedField);
+  } else {
+    p.fields.splice(toIdx, 0, movedField);
+  }
+
+  if (oldSection !== targetSection) {
+    persist(
+      'Moveu campo de seção',
+      p,
+      `${movedField.name} (${oldSection})`,
+      `${movedField.name} (${targetSection})`
+    );
+    notify(`Campo "${movedField.name}" movido para "${targetSection}".`);
+  } else {
+    persist('Reordenou campo', p, '', movedField.name);
+    notify('Ordem dos campos atualizada.');
+  }
+
+  editFields(pid, targetSection);
+  render();
+}
+
+// --- MODAL PRINCIPAL DE GERENCIAMENTO ---
+editFields = function (pid, focusSection = '') {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos e seções do projeto.', 'error');
+    return;
+  }
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p || !canEdit(p)) return;
+
+  p.fields.forEach((f) => {
+    if (!f.group) f.group = 'Essenciais';
+  });
+
+  const sections = getProjectSections(p);
+
+  const sectionsHtml = sections
+    .map((secName) => {
+      const secFields = p.fields.filter((f) => (f.group || 'Outras informações') === secName);
+      const theme = getGroupTheme(secName, p);
+      const isFocused = focusSection === secName;
+      const escapedSec = esc(secName).replace(/'/g, "\\'");
+
+      return `
+      <div class="panel"
+           data-sec-card="${esc(secName)}"
+           draggable="true"
+           ondragstart="secapSectionDragStart(event, '${escapedSec}')"
+           ondragend="secapSectionDragEnd(this)"
+           ondragover="secapSectionDragOver(event, '${escapedSec}')"
+           ondragleave="secapSectionDragLeave(event)"
+           ondrop="secapSectionDrop(event, '${pid}', '${escapedSec}')"
+           style="margin-bottom: 14px; border: 1px solid ${isFocused ? theme.color : '#e2e8f0'}; border-left: 4px solid ${theme.color}; transition: box-shadow 0.15s ease, outline 0.15s ease;">
+        <div class="panelhead" style="background: ${theme.bg}; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; cursor: grab;">
+          <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <span title="Arraste para reordenar a seção" style="color: #64748b; font-weight: 700; letter-spacing: -1px; user-select: none; cursor: grab; padding-right: 2px;">⋮⋮</span>
+            <span style="color: ${theme.color}; display: inline-flex; flex-shrink: 0;">${icon(getGroupIcon(secName))}</span>
+            <strong style="color: #0f172a; font-size: 14px;">${esc(secName)}</strong>
+            <span class="badge" style="font-size: 11px;">${secFields.length}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <button type="button" class="iconbtn" title="Renomear seção" onclick="renameProjectSectionPrompt('${pid}', '${escapedSec}')">${icon('edit')}</button>
+            <button type="button" class="btn secondary small" style="margin-left: 4px;" onclick="fieldForm('${pid}', '', '${escapedSec}')">
+              ${icon('plus')} Campo
+            </button>
+          </div>
+        </div>
+        <div style="padding: 4px 12px; min-height: 28px;">
+          ${
+            secFields.length
+              ? secFields
+                  .map((f) => {
+                    const isProtected = PROTECTED_SYSTEM_FIELDS.has(f.id);
+                    return `
+                    <div data-field-row="${esc(f.id)}"
+                         draggable="true"
+                         ondragstart="secapFieldDragStart(event, '${f.id}', '${escapedSec}')"
+                         ondragend="secapFieldDragEnd(event, this)"
+                         ondragover="secapFieldDragOver(event, '${f.id}', '${escapedSec}')"
+                         ondragleave="secapFieldDragLeave(event)"
+                         ondrop="secapFieldDrop(event, '${pid}', '${f.id}', '${escapedSec}')"
+                         style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; background: #fff; text-align: left;">
+                      <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left;">
+                        <span title="Arraste para reordenar ou mover para outra seção" style="color: #94a3b8; font-weight: 700; letter-spacing: -1px; user-select: none; cursor: grab; flex-shrink: 0;">⋮⋮</span>
+                        <div style="min-width: 0; text-align: left;">
+                          <div style="font-weight: 600; color: #0f172a; font-size: 13.5px; line-height: 1.3;">${esc(f.name)}</div>
+                          <small style="color: #64748b; display: block; font-size: 11.5px; line-height: 1.3;">
+                            ${typeNames[f.type] || f.type}${f.required ? ' · <strong style="color:#c93636">Obrigatório</strong>' : ''}${f.type === 'date' ? ' · Calendário' : ''}${isProtected ? ' · Padrão' : ''}
+                          </small>
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <button type="button" class="iconbtn" title="Editar campo ou trocar de seção" aria-label="Editar campo" onclick="fieldForm('${pid}', '${f.id}')">${icon('edit')}</button>
+                        ${
+                          !isProtected
+                            ? `<button type="button" class="iconbtn" title="Excluir campo" aria-label="Excluir campo" onclick="removeField('${pid}', '${f.id}')">${icon('trash')}</button>`
+                            : ''
+                        }
+                      </div>
+                    </div>`;
+                  })
+                  .join('')
+              : '<p class="subtitle" style="padding: 8px 0; margin: 0; font-size: 12px;">Arraste um campo para cá ou clique em "+ Campo".</p>'
+          }
+        </div>
+      </div>`;
+    })
+    .join('');
+
+  modal(
+    'Personalizar seções e campos',
+    `<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+      <div style="text-align: left;">
+        <p class="subtitle" style="margin: 0;"><strong>${esc(p.name)}</strong></p>
+        <small style="color: #64748b;">Arraste pela alça <strong>⋮⋮</strong> para reordenar seções ou mover campos entre elas.</small>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn secondary small" onclick="createProjectSectionPrompt('${pid}')">${icon('plus')} Nova seção</button>
+        <button type="button" class="btn secondary small" onclick="openEditSectionColorsModal('${pid}')">${icon('edit')} Cores</button>
+      </div>
+    </div>
+    <div style="max-height: 62vh; overflow-y: auto; padding-right: 4px;">
+      ${sectionsHtml}
+    </div>`,
+    btn('Adicionar campo', `fieldForm('${pid}')`, 'plus', 'primary') +
+      btn('Concluir', 'closeModal(); render()', 'check')
+  );
+};
+
+function createProjectSectionPrompt(pid) {
+  if (!isSysAdmin()) return;
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  modal(
+    'Nova seção',
+    `<form id="newSectionForm" onsubmit="event.preventDefault(); saveNewProjectSection('${pid}')">
+      <div class="field">
+        <label>Nome da nova seção *</label>
+        <input name="sectionName" required maxlength="60" placeholder="Ex.: Licenciamento Ambiental, Fiscalização, Medições">
+      </div>
+      <div class="field">
+        <label>Cor de identificação da seção</label>
+        <input name="sectionColor" type="color" value="#003856" style="height: 40px;">
+      </div>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+      <p class="subtitle" style="margin-bottom: 12px;">Crie o primeiro campo desta seção:</p>
+      <div class="field">
+        <label>Nome do primeiro campo *</label>
+        <input name="firstFieldName" required maxlength="80" placeholder="Ex.: Número da Licença">
+      </div>
+      <div class="field">
+        <label>Tipo de informação</label>
+        <select name="firstFieldType">
+          ${Object.entries(typeNames)
+            .map(([k, v]) => `<option value="${k}">${v}</option>`)
+            .join('')}
+        </select>
+      </div>
+    </form>`,
+    btn('Voltar', `editFields('${pid}')`, 'arrow') +
+      `<button class="btn primary" type="submit" form="newSectionForm">${icon('check')} Criar seção</button>`
+  );
+}
+
+function saveNewProjectSection(pid) {
+  if (!isSysAdmin()) return;
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  const data = new FormData($('#newSectionForm'));
+  const sectionName = String(data.get('sectionName') || '').trim();
+  const sectionColor = String(data.get('sectionColor') || '#003856');
+  const firstFieldName = String(data.get('firstFieldName') || '').trim();
+  const firstFieldType = String(data.get('firstFieldType') || 'text');
+
+  if (!sectionName || !firstFieldName) return;
+
+  const existingSections = getProjectSections(p);
+  if (existingSections.some((s) => s.toLowerCase() === sectionName.toLowerCase())) {
+    return notify('Já existe uma seção com este nome neste projeto.', 'error');
+  }
+
+  p.groupOrder = [...existingSections, sectionName];
+  p.groupColors = { ...(p.groupColors || {}), [sectionName]: sectionColor };
+  p.fields.push({
+    id: 'f_' + uid(),
+    name: firstFieldName,
+    type: firstFieldType,
+    group: sectionName,
+    required: false,
+  });
+
+  persist('Criou seção ' + sectionName, p, '', sectionName);
+  editFields(pid, sectionName);
+  render();
+  notify(`Seção "${sectionName}" criada com sucesso.`);
+}
+
+function renameProjectSectionPrompt(pid, oldName) {
+  if (!isSysAdmin()) return;
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  modal(
+    'Renomear seção',
+    `<form id="renameSectionForm" onsubmit="event.preventDefault(); saveRenameProjectSection('${pid}', '${esc(oldName).replace(/'/g, "\\'")}')">
+      <div class="field">
+        <label>Novo nome da seção *</label>
+        <input name="newName" required maxlength="60" value="${esc(oldName)}">
+        <small>Todos os campos desta seção serão movidos automaticamente para o novo nome.</small>
+      </div>
+    </form>`,
+    btn('Voltar', `editFields('${pid}')`, 'arrow') +
+      `<button class="btn primary" type="submit" form="renameSectionForm">${icon('check')} Salvar nome</button>`
+  );
+}
+
+function saveRenameProjectSection(pid, oldName) {
+  if (!isSysAdmin()) return;
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+
+  const newName = String(new FormData($('#renameSectionForm')).get('newName') || '').trim();
+  if (!newName) return;
+  if (newName === oldName) return editFields(pid, oldName);
+
+  const sections = getProjectSections(p);
+  if (sections.some((s) => s.toLowerCase() === newName.toLowerCase())) {
+    return notify('Já existe uma seção com esse nome.', 'error');
+  }
+
+  p.fields.forEach((f) => {
+    if ((f.group || 'Outras informações') === oldName) {
+      f.group = newName;
+    }
+  });
+
+  if (Array.isArray(p.groupOrder)) {
+    p.groupOrder = p.groupOrder.map((g) => (g === oldName ? newName : g));
+  }
+  if (p.groupColors && p.groupColors[oldName]) {
+    p.groupColors[newName] = p.groupColors[oldName];
+    delete p.groupColors[oldName];
+  }
+
+  persist('Renomeou seção', p, oldName, newName);
+  editFields(pid, newName);
+  render();
+  notify('Seção renomeada.');
+}
+
+fieldForm = function (pid, fid = '', defaultSection = 'Essenciais') {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p) return;
+  const f = p.fields.find((x) => x.id === fid);
+  const sections = getProjectSections(p);
+  const currentGroup = f?.group || defaultSection || sections[0] || 'Essenciais';
+
+  modal(
+    f ? 'Editar campo' : 'Adicionar campo',
+    `<form id="fieldForm" onsubmit="event.preventDefault(); saveField('${pid}', '${fid}')">
+      <div class="field">
+        <label>Seção (aba/bloco da obra) *</label>
+        <select name="group" required>
+          ${sections
+            .map(
+              (sec) =>
+                `<option value="${esc(sec)}" ${currentGroup === sec ? 'selected' : ''}>${esc(sec)}</option>`
+            )
+            .join('')}
+        </select>
+        <small>Define em qual bloco da ficha da obra este campo aparecerá.</small>
+      </div>
+      <div class="field">
+        <label>Nome do campo *</label>
+        <input required name="name" value="${esc(f?.name || '')}" placeholder="Ex.: Região, vistoria ou valor do convênio">
+      </div>
+      <div class="field">
+        <label>Tipo de informação</label>
+        <select name="type" ${f ? 'disabled' : ''} onchange="$('#optionsArea').style.display=this.value==='select'?'block':'none'">
+          ${Object.entries(typeNames)
+            .map(
+              ([k, v]) => `<option value="${k}" ${f?.type === k ? 'selected' : ''}>${v}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+      <div class="field" id="optionsArea" style="display:${f?.type === 'select' ? 'block' : 'none'}">
+        <label>Opções da lista (separadas por vírgula)</label>
+        <textarea name="options" rows="3" placeholder="Planejamento, Execução, Concluído">${esc(f?.options?.join(', ') || '')}</textarea>
+        <small>As listas ficam disponíveis para agrupar o Kanban automaticamente.</small>
+      </div>
+      <div class="field">
+        <label>Ajuda para quem preenche</label>
+        <input name="help" value="${esc(f?.help || '')}" placeholder="Explique de forma simples o que informar aqui.">
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+        <input name="required" type="checkbox" ${f?.required ? 'checked' : ''}> Preenchimento obrigatório
+      </label>
+    </form>`,
+    btn('Voltar', `editFields('${pid}', '${esc(currentGroup).replace(/'/g, "\\'")}')`, 'arrow') +
+      `<button class="btn primary" type="submit" form="fieldForm">${icon('check')} Salvar campo</button>`
+  );
+};
+
+saveField = function (pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
+  const p = db.projects.find((x) => x.id === pid);
+  if (!p || !canEdit(p)) return;
+
+  const data = new FormData($('#fieldForm'));
+  const old = p.fields.find((x) => x.id === fid);
+  const type = old?.type || data.get('type');
+  const group = String(data.get('group') || old?.group || 'Essenciais').trim();
+  const options = [
+    ...new Set(
+      String(data.get('options') || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  if (type === 'select' && !options.length) {
+    return notify('Adicione pelo menos uma opção à lista.', 'error');
+  }
+
+  const f = {
+    id: fid || 'f_' + uid(),
+    name: String(data.get('name') || '').trim(),
+    type,
+    group,
+    options: type === 'select' ? options : undefined,
+    help: String(data.get('help') || '').trim(),
+    required: data.has('required'),
+  };
+
+  if (!f.name) return;
+
+  const before = old ? `${old.name} (${old.group || 'Essenciais'})` : '';
+  if (old) Object.assign(old, f);
+  else p.fields.push(f);
+
+  persist('Personalizou campo', p, before, `${f.name} (${f.group})`);
+  editFields(pid, group);
+  render();
+  notify('Campo salvo e conectado às obras.');
+};
+
+editRecord = function (pid, rid = '') {
+  const p = visible().find((project) => project.id === pid);
+  if (!p) return;
+  const r = p.records.find((record) => record.id === rid);
+  const edit = canEdit(p);
+
+  if (!r) {
+    openRecordForm(pid, rid);
+    return;
+  }
+
+  closeFullscreenDetail();
+
+  const fields = p.fields;
+  const groups = getProjectSections(p);
+
+  const detailContainer = document.createElement('div');
+  detailContainer.id = 'fullscreenDetailView';
+  detailContainer.className = 'fullscreen-detail-page';
+
+  detailContainer.innerHTML = `
+    <header class="fullscreen-header">
+      <div style="display:flex; align-items:center; gap:16px;">
+        <button class="btn" type="button" onclick="closeFullscreenDetail()">${icon('arrow')} Voltar às obras</button>
+        <div>
+          <span class="eyebrow">${esc(p.name)}</span>
+          <h1 style="margin:0; font-size:20px; color:#0f172a; font-weight:700;">${esc(r.nome || Object.values(r)[1] || 'Registro')}</h1>
+        </div>
+      </div>
+      <div class="actions" style="display:flex; gap:10px;">
+        ${isSysAdmin() ? `<button class="btn secondary" type="button" onclick="closeFullscreenDetail(); editFields('${pid}')">${icon('edit')} Configurar seções e campos</button>` : ''}
+        ${edit ? `<button class="btn primary" type="button" onclick="closeFullscreenDetail(); openRecordForm('${pid}','${rid}')">${icon('edit')} Editar dados</button>` : ''}
+        <button class="iconbtn" type="button" onclick="closeFullscreenDetail()" title="Fechar">${icon('close')}</button>
+      </div>
+    </header>
+
+    <div class="fullscreen-content">
+      <div class="stats" style="margin-bottom: 24px;">
+        <div class="stat">
+          <div class="top">SITUAÇÃO</div>
+          <div class="number" style="font-size:16px;">${badge(r.status)}</div>
+        </div>
+        <div class="stat">
+          <div class="top">AVANÇO FÍSICO</div>
+          <div class="number">${r.progresso !== '' && r.progresso != null ? r.progresso + '%' : '—'}</div>
+        </div>
+        <div class="stat">
+          <div class="top">INVESTIMENTO</div>
+          <div class="number">${r.valor !== '' && r.valor != null ? money(r.valor) : '—'}</div>
+        </div>
+        <div class="stat">
+          <div class="top">PRAZO DE ENTREGA</div>
+          <div class="number" style="font-size:16px;">${date(r.prazo)}</div>
+        </div>
+      </div>
+
+      ${groups
+        .map((g) => {
+          const groupFields = fields.filter((f) => (f.group || 'Outras informações') === g);
+          const theme = getGroupTheme(g, p);
+          return `
+          <div class="section-group-header" style="--sec-color: ${theme.color}; --sec-bg: ${theme.bg}; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h2 style="margin: 0;">${icon(getGroupIcon(g))} ${esc(g)}</h2>
+              <span class="count-badge">${groupFields.length} campos</span>
+            </div>
+            ${
+              isSysAdmin()
+                ? `<button type="button" class="btn secondary small" onclick="closeFullscreenDetail(); editFields('${pid}', '${esc(g).replace(/'/g, "\\'")}')">
+                    ${icon('edit')} Editar campos da seção
+                  </button>`
+                : ''
+            }
+          </div>
+          <div class="detail-grid" style="--sec-color: ${theme.color};">
+            ${groupFields
+              .map((f) => {
+                const val = r[f.id];
+                let displayVal = esc(val ?? '—');
+                if (f.type === 'date') displayVal = date(val);
+                if (f.type === 'currency')
+                  displayVal = val !== '' && val != null ? money(val) : '—';
+
+                return `
+                <div class="detail-card">
+                  <label>${esc(f.name)}</label>
+                  <div class="val">${displayVal || '—'}</div>
+                </div>
+              `;
+              })
+              .join('')}
+          </div>
+        `;
+        })
+        .join('')}
+    </div>
+  `;
+
+  document.body.appendChild(detailContainer);
+};
+
+openRecordForm = function (pid, rid = '') {
+  const p = visible().find((project) => project.id === pid);
+  if (!p) return;
+
+  const r = (p.records || []).find((record) => record.id === rid);
+  const edit = canEdit(p);
+  const allowed =
+    typeof getAllowedFieldsForCurrentUser === 'function'
+      ? getAllowedFieldsForCurrentUser(p.id)
+      : isSysAdmin()
+        ? null
+        : [];
+  const canEditAnyField = edit && (allowed === null || allowed.length > 0);
+  const groups = getProjectSections(p);
+
+  const fieldMarkup = groups.length
+    ? groups
+        .map((group) => {
+          const fields = p.fields.filter(
+            (field) => (field.group || 'Outras informações') === group
+          );
+          const theme = getGroupTheme(group, p);
+          return `
+          <section class="edit-section-group" style="margin-bottom: 32px;">
+            <div class="section-group-header" style="--sec-color: ${theme.color}; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 style="color: ${theme.color}; display: flex; align-items: center; gap: 10px; margin: 0;">
+                  ${icon(getGroupIcon(group))} ${esc(group)}
+                </h2>
+                <span class="count-badge" style="background-color: ${theme.bg}; color: ${theme.color}; border: 1px solid ${theme.color};">${fields.length} campos</span>
+              </div>
+              ${
+                isSysAdmin()
+                  ? `<button type="button" class="btn secondary small" onclick="editFields('${pid}', '${esc(group).replace(/'/g, "\\'")}')">
+                      ${icon('edit')} Editar campos da seção
+                    </button>`
+                  : ''
+              }
+            </div>
+            <div class="edit-cards-grid">
+              ${fields
+                .map((field) => {
+                  const fieldAllowed =
+                    edit && (allowed === null || allowed.includes(String(field.id)));
+                  const htmlField = inputField(field, r?.[field.id], !fieldAllowed);
+                  return htmlField.replace(
+                    'class="field"',
+                    `class="field" style="border: 1px solid #e2e8f0 !important; border-top: 3.5px solid ${theme.color} !important;"`
+                  );
+                })
+                .join('')}
+            </div>
+          </section>`;
+        })
+        .join('')
+    : '<p class="subtitle">Este projeto ainda não possui campos cadastrados.</p>';
+
+  modal(
+    r ? 'Editar obra / subprojeto' : 'Cadastrar obra / subprojeto',
+    `<div class="record-form-intro" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+       <div>
+         <p class="subtitle" style="margin-bottom:4px;">${esc(p.name)}</p>
+         <p class="metric-note" style="margin:0;">Preencha os campos organizados por seção.</p>
+       </div>
+       ${
+         isSysAdmin()
+           ? `<div style="display:flex; gap:8px;">
+                <button class="btn secondary small" type="button" onclick="editFields('${pid}')">
+                  ${icon('plus')} Gerenciar seções e campos
+                </button>
+                <button class="btn secondary small" type="button" onclick="openEditSectionColorsModal('${pid}', '${rid}')">
+                  ${icon('edit')} Cores das seções
+                </button>
+              </div>`
+           : ''
+       }
+     </div>
+     ${allowed !== null && canEditAnyField ? '<div class="perm-legend" aria-label="Legenda dos campos"><span class="perm-legend-item is-editable"><i></i>Campos que você pode editar</span><span class="perm-legend-item is-readonly"><i></i>Campos somente leitura</span></div>' : ''}
+     ${!canEditAnyField ? '<div class="summary-strip"><p><strong>Nenhum campo liberado para edição.</strong> Solicite ao administrador que configure suas permissões para este projeto.</p></div>' : ''}
+     <form id="recordForm" onsubmit="event.preventDefault();saveRecord('${pid}','${rid}')" style="padding-top:10px;">
+       ${fieldMarkup}
+     </form>`,
+    (edit && r ? btn('Excluir', `deleteRecord('${pid}','${rid}')`, 'trash') : '') +
+      btn('Cancelar', r ? `editRecord('${pid}','${rid}')` : 'closeModal()', 'arrow') +
+      (canEditAnyField
+        ? `<button class="btn primary" form="recordForm" type="submit">${icon('check')} ${r ? 'Salvar alterações' : 'Cadastrar obra'}</button>`
+        : '')
+  );
 };
 
 render();

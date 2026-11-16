@@ -1080,6 +1080,7 @@ admin = function () {
 function adminSolicitacoes() {
   return `<section class=\"panel solicitacoes-panel\"><div class=\"panelhead\"><div><h2>Solicitações</h2><p class=\"subtitle\">Acompanhe e responda as solicitações no sistema de solicitações da SECAP. O link abre em uma nova aba.</p></div><button class=\"btn primary\" type=\"button\" onclick=\"openSolicitacoes()\">${icon('link')} Ir para solicitações</button></div></section>`;
 }
+
 function setAdminSection() {
   adminSection = 'access';
   render();
@@ -1181,3 +1182,469 @@ function biTemplateContext(p, rs) {
   return '';
 }
 render();
+
+/* ============================================================================
+   SECAP · CONTROLE GRANULAR DE PERMISSÕES POR CAMPO E OBRA (ADMINISTRAÇÃO)
+   ============================================================================ */
+
+if (!db.fieldPermissions) {
+  // Estrutura: { [userId]: { [projectId]: ['fieldId1', 'fieldId2', ...] } }
+  db.fieldPermissions = {};
+}
+
+let permSelectedUser = '',
+  permSelectedProject = '';
+
+// 1. Reestrutura a aba Administração com sub-abas no padrão visual do portal
+admin = function () {
+  if (!isSysAdmin())
+    return empty(
+      'Acesso do administrador',
+      'Esta área está disponível somente para o perfil administrador.'
+    );
+
+  if (!['access', 'field-perms'].includes(adminSection)) {
+    adminSection = 'access';
+  }
+
+  return (
+    backLink() +
+    `<section class="admin-institution">
+      <img src="logo-negative.png" alt="Prefeitura de Goiânia">
+      <div>
+        <div class="institution-label">PREFEITURA DE GOIÂNIA · SECAP<br>${esc(db.portalSettings.department.replace(/^Secretaria Municipal de /, ''))}</div>
+        <h1>Administração</h1>
+        <p>Gerencie o acesso ao sistema e defina quais campos cada usuário pode editar por projeto.</p>
+      </div>
+      <div class="admin-badge">${icon('shield')}Administrador</div>
+    </section>
+    <nav class="subtabs" aria-label="Sub-abas da administração">
+      <button class="${adminSection === 'access' ? 'active' : ''}" aria-current="${adminSection === 'access' ? 'page' : 'false'}" onclick="setAdminSection('access')">
+        ${icon('user')}Acesso ao sistema
+      </button>
+      <button class="${adminSection === 'field-perms' ? 'active' : ''}" aria-current="${adminSection === 'field-perms' ? 'page' : 'false'}" onclick="setAdminSection('field-perms')">
+        ${icon('edit')}Permissões por campo
+      </button>
+    </nav>` +
+    (adminSection === 'field-perms' ? adminFieldPermissions() : adminSolicitacoes() + adminAccess())
+  );
+};
+
+let cachedServerUsers = null;
+
+let fieldPermUsersCache = null;
+
+setAdminSection = function (section = 'access') {
+  adminSection = section;
+  render();
+  if (section === 'access' && typeof loadAccountRequests === 'function') {
+    loadAccountRequests();
+  }
+  if (section === 'field-perms') {
+    ensureFieldPermUsersLoaded();
+  }
+};
+
+async function ensureFieldPermUsersLoaded() {
+  try {
+    const response = await fetch('/api/account-requests', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.ok && Array.isArray(result.requests)) {
+      fieldPermUsersCache = result.requests;
+      render();
+    }
+  } catch (error) {
+    console.error('Erro ao consultar usuários aprovados:', error);
+  }
+}
+
+function getApprovedPortalUsers() {
+  const reqs = Array.isArray(fieldPermUsersCache)
+    ? fieldPermUsersCache
+    : typeof accountRequestsCache !== 'undefined' && Array.isArray(accountRequestsCache)
+      ? accountRequestsCache
+      : [];
+
+  // A RPC do Supabase retorna status 'aprovada' e profile_role='usuario'.
+  // O ID disponível aqui é o da solicitação, não o UUID de auth.users;
+  // por isso o e-mail é a chave estável usada também na verificação da edição.
+  return reqs.filter((r) => {
+    const status = String(r.status || '')
+      .trim()
+      .toLowerCase();
+    const role = String(r.profile_role || r.role || '')
+      .trim()
+      .toLowerCase();
+    const email = String(r.email || '')
+      .trim()
+      .toLowerCase();
+
+    const isApproved = ['aprovada', 'aprovado', 'approved', 'active', 'ativo'].includes(status);
+    const isUser = !role || ['usuario', 'usuário', 'user'].includes(role);
+    const isAdmin =
+      ['administrador', 'admin'].includes(role) ||
+      email === 'secap@gmail.com' ||
+      Boolean(r.isAdmin);
+
+    return isApproved && isUser && !isAdmin && Boolean(email);
+  });
+}
+
+async function loadFieldPermUsers() {
+  try {
+    // Usa exatamente o mesmo endpoint da loadAccountRequests()
+    const res = await fetch('/api/account-requests');
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : data.requests || data.items || [];
+
+    // Filtra apenas os usuários que tiveram o acesso aprovado
+    const approved = list.filter((r) =>
+      ['approved', 'aprovado'].includes(String(r.status || '').toLowerCase())
+    );
+
+    // Ignora administradores, pois já possuem acesso irrestrito
+    cachedServerUsers = approved.filter(
+      (u) => u.role !== 'Administrador' && u.role !== 'admin' && !u.isAdmin
+    );
+
+    render();
+  } catch (err) {
+    console.error('Erro ao carregar usuários aprovados:', err);
+  }
+}
+
+// 2. Renderização da Sub-aba "Permissões por campo"
+function adminFieldPermissions() {
+  const users = getApprovedPortalUsers();
+  const projects = Array.isArray(db.projects) ? db.projects : [];
+
+  if (
+    permSelectedUser &&
+    !users.some(
+      (u) =>
+        String(u.email || '')
+          .trim()
+          .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+    )
+  ) {
+    permSelectedUser = '';
+  }
+  if (permSelectedProject && !projects.some((p) => String(p.id) === String(permSelectedProject))) {
+    permSelectedProject = '';
+  }
+
+  const selectedProjObj = projects.find((p) => String(p.id) === String(permSelectedProject));
+  const userMap = db.fieldPermissions?.[permSelectedUser] || {};
+  // Uma regra só existe quando o administrador salvou explicitamente a lista de campos permitidos.
+  const hasExplicitRule =
+    permSelectedUser && permSelectedProject && Array.isArray(userMap[permSelectedProject]);
+
+  // Segurança por padrão: sem regra explícita, nenhum campo pode ser editado.
+  const allowedFields = hasExplicitRule ? userMap[permSelectedProject] : [];
+  const selectedUserItem = permSelectedUser
+    ? users.find(
+        (u) =>
+          String(u.email || '')
+            .trim()
+            .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+      )
+    : null;
+  const accessNotice = fieldPermAccessNotice(selectedUserItem, selectedProjObj);
+
+  return `
+    <section class="panel">
+      <div class="panelhead">
+        <div>
+          <h2>Permissões de edição por obra e campo</h2>
+          <p class="subtitle">Selecione um usuário e um projeto para restringir exatamente quais colunas/campos ele poderá alterar.</p>
+        </div>
+        ${
+          permSelectedUser && permSelectedProject
+            ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn" onclick="toggleAllPermFields(true)" title="Permitir edição de todos os campos">${icon('check')}Marcar todos</button>
+                <button type="button" class="btn" onclick="toggleAllPermFields(false)" title="Bloquear edição de todos os campos">${icon('close')}Desmarcar todos</button>
+              </div>`
+            : ''
+        }
+      </div>
+      <div class="panelbody">
+        <div class="twocol" style="margin-bottom:20px">
+          <div class="field">
+            <label for="permUserSelect">1. Usuário</label>
+            <select id="permUserSelect" onchange="permSelectedUser=this.value;render()">
+              <option value="">Selecione um usuário...</option>
+              ${users
+                .map((u) => {
+                  // O endpoint admin_list_account_requests não expõe auth.uid();
+                  // usar o e-mail evita salvar regras sob o ID numérico da solicitação.
+                  const uid = String(u.email || u.user_id || u.id)
+                    .trim()
+                    .toLowerCase();
+                  const displayName = u.name || u.full_name || u.nome || u.email;
+                  const label = `${displayName}${u.email && displayName !== u.email ? ' (' + u.email + ')' : ''}`;
+                  return `<option value="${esc(uid)}" ${String(permSelectedUser) === uid ? 'selected' : ''}>${esc(label)}</option>`;
+                })
+                .join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="permProjectSelect">2. Projeto / Pasta de Obras</label>
+            <select id="permProjectSelect" ${!permSelectedUser ? 'disabled' : ''} onchange="permSelectedProject=this.value;render()">
+              <option value="">Selecione um projeto...</option>
+              ${projects
+                .map(
+                  (p) =>
+                    `<option value="${esc(p.id)}" ${String(permSelectedProject) === String(p.id) ? 'selected' : ''}>${esc(p.name)} (${(p.records || []).length} registros)</option>`
+                )
+                .join('')}
+            </select>
+          </div>
+        </div>
+
+        ${
+          !permSelectedUser || !permSelectedProject
+            ? empty(
+                'Selecione usuário e projeto',
+                'Escolha um usuário e a pasta de obras acima para configurar os campos permitidos.'
+              )
+            : !selectedProjObj?.fields?.length
+              ? empty(
+                  'Projeto sem campos cadastrados',
+                  'Este projeto ainda não possui campos configurados.'
+                )
+              : `
+                ${accessNotice}
+                <div class="summary-strip" style="margin-bottom:18px">
+                  ${icon('shield')}
+                  <p>
+                    <strong>${hasExplicitRule ? 'Regra personalizada ativa.' : 'Padrão restrito (nenhum campo liberado).'}</strong>
+                    Marque abaixo apenas os campos que este usuário pode editar em <strong>${esc(selectedProjObj.name)}</strong>.
+                  </p>
+                </div>
+                <form id="fieldPermsForm" onsubmit="event.preventDefault();saveFieldPermissions()">
+                  <div class="template-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+                    ${selectedProjObj.fields
+                      .map((f) => {
+                        const checked = allowedFields.includes(f.id);
+                        return `
+                          <label class="template-option" style="align-items:center">
+                            <input type="checkbox" name="perm_field" value="${esc(f.id)}" ${checked ? 'checked' : ''}>
+                            <span>
+                              <b>${esc(f.name)}</b>
+                              <small>ID: ${esc(f.id)} · Tipo: ${esc(f.type)}</small>
+                            </span>
+                          </label>
+                        `;
+                      })
+                      .join('')}
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:22px;padding-top:16px;border-top:1px solid var(--line,#e2e8f0)">
+                    ${
+                      hasExplicitRule
+                        ? `<button type="button" class="btn" onclick="resetFieldPermissions()">Restaurar padrão (bloquear todos)</button>`
+                        : ''
+                    }
+                    <button type="submit" class="btn primary">${icon('check')}Salvar permissões de campos</button>
+                  </div>
+                </form>
+              `
+        }
+      </div>
+    </section>
+  `;
+}
+
+// Avisos de contexto: as permissões por campo só têm efeito se o usuário também tiver
+// "Visualizar e editar" e acesso ao projeto (ambos definidos em Acesso ao sistema).
+function fieldPermAccessNotice(item, project) {
+  if (!item || !project) return '';
+  const notes = [];
+  if (item.obras_access !== 'editar') {
+    notes.push(
+      `<strong>${esc(item.name || item.email)} está como “Somente visualizar”.</strong> Os campos marcados abaixo só valem quando o acesso às obras for “Visualizar e editar”.` +
+        ` <button type="button" class="btn small" onclick="grantEditFromFieldPerms(${Number(item.id)})">Liberar edição</button>`
+    );
+  }
+  if (
+    item.project_scope === 'selected' &&
+    !(item.project_ids || []).map(String).includes(String(project.id))
+  ) {
+    notes.push(
+      `<strong>Este usuário não tem acesso ao projeto ${esc(project.name)}.</strong> Inclua o projeto em “Projetos permitidos”, na sub-aba Acesso ao sistema, para que as permissões abaixo tenham efeito.`
+    );
+  }
+  return notes
+    .map(
+      (html) =>
+        `<div class="summary-strip" style="margin-bottom:12px;border-color:#f59e0b;background:#fffbeb">${icon('shield')}<p>${html}</p></div>`
+    )
+    .join('');
+}
+
+async function grantEditFromFieldPerms(requestId) {
+  if (!isSysAdmin()) return;
+  const id = Number(requestId);
+  if (!Number.isSafeInteger(id) || id < 1) return;
+  try {
+    const response = await fetch('/api/account-requests/obras-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, access: 'editar' }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível alterar a permissão.');
+    // As duas listas (desta sub-aba e de Acesso ao sistema) guardam cópias separadas.
+    [fieldPermUsersCache, typeof accountRequestsCache !== 'undefined' ? accountRequestsCache : null]
+      .filter(Array.isArray)
+      .forEach((list) => {
+        const found = list.find((r) => Number(r.id) === id);
+        if (found) found.obras_access = 'editar';
+      });
+    render();
+    notify('Acesso às obras alterado para “Visualizar e editar”.', 'success');
+  } catch (error) {
+    notify(`Erro ao alterar a permissão: ${error.message}`, 'error');
+  }
+}
+
+function toggleAllPermFields(checked) {
+  const form = document.getElementById('fieldPermsForm');
+  if (!form) return;
+
+  form.querySelectorAll('input[name="perm_field"]').forEach((field) => {
+    field.checked = Boolean(checked);
+  });
+}
+
+function saveFieldPermissions() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  const checked = Array.from(
+    document.querySelectorAll('#fieldPermsForm input[name="perm_field"]:checked')
+  ).map((el) => el.value);
+
+  if (!db.fieldPermissions[permSelectedUser]) {
+    db.fieldPermissions[permSelectedUser] = {};
+  }
+  db.fieldPermissions[permSelectedUser][permSelectedProject] = checked;
+
+  const u = getApprovedPortalUsers().find(
+    (x) =>
+      String(x.email || '')
+        .trim()
+        .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+  );
+  const p = db.projects.find((x) => String(x.id) === String(permSelectedProject));
+
+  persist(
+    'Configurou permissões de campos',
+    `${u?.name || u?.email || permSelectedUser} · ${p?.name || permSelectedProject}`,
+    '',
+    `${checked.length} campo(s) liberado(s)`
+  );
+  render();
+  notify('Permissões de campos salvas com sucesso.');
+}
+
+function resetFieldPermissions() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  if (db.fieldPermissions?.[permSelectedUser]) {
+    delete db.fieldPermissions[permSelectedUser][permSelectedProject];
+  }
+  persist('Restaurou padrão de permissões', permSelectedProject, '', 'Todos os campos bloqueados');
+  render();
+  notify('Padrão restaurado: nenhum campo liberado para este usuário.');
+}
+
+// 3. Helper de verificação e bloqueio automático no Modal de Edição de Obra
+function getAllowedFieldsForCurrentUser(projectId) {
+  if (isSysAdmin()) return null; // null = acesso total do administrador
+  const user = me() || window.SECAP_MEMBER;
+  if (!user) return [];
+
+  const pid = String(projectId);
+  const email = String(user.email || window.SECAP_EMAIL || '')
+    .trim()
+    .toLowerCase();
+  const id = String(user.id || '').trim();
+  const permissions = db.fieldPermissions || {};
+  const byEmail = email ? permissions[email]?.[pid] : null;
+  const byId = id ? permissions[id]?.[pid] : null;
+  const rules = Array.isArray(byEmail) ? byEmail : Array.isArray(byId) ? byId : null;
+
+  // Ausência de regra não significa liberação: acesso negado por padrão.
+  return rules ? rules.map(String) : [];
+}
+
+// Aplica as permissões também ao formulário de criação/edição, que é aberto
+// diretamente por vários pontos da interface (não apenas por editRecord).
+if (typeof openRecordForm === 'function') {
+  const openRecordFormOriginal = openRecordForm;
+  openRecordForm = function (projId, recId = '') {
+    const result = openRecordFormOriginal(projId, recId);
+    const allowed = getAllowedFieldsForCurrentUser(projId);
+    if (allowed === null) return result;
+
+    const project = (db.projects || []).find((item) => String(item.id) === String(projId));
+    const form = document.getElementById('recordForm');
+    if (!project || !form) return result;
+
+    project.fields.forEach((field) => {
+      if (allowed.includes(String(field.id))) return;
+      const input = form.querySelector(`[name="${CSS.escape(String(field.id))}"]`);
+      if (!input) return;
+      input.disabled = true;
+      input.title = 'Você não tem permissão para editar este campo neste projeto.';
+      input.setAttribute('aria-disabled', 'true');
+      input.style.opacity = '0.6';
+      input.style.cursor = 'not-allowed';
+    });
+
+    if (!allowed.length) {
+      const saveButton = document.querySelector('#modal button[type="submit"][form="recordForm"]');
+      if (saveButton) saveButton.disabled = true;
+      const notice = document.createElement('p');
+      notice.className = 'subtitle';
+      notice.style.cssText = 'color:#b45309;margin:12px 0 0';
+      notice.textContent =
+        'Você não possui permissão para editar campos deste projeto. Solicite a liberação ao administrador.';
+      form.appendChild(notice);
+    }
+    return result;
+  };
+}
+
+if (typeof editRecord === 'function') {
+  const editRecordOriginal = editRecord;
+  editRecord = function (projId, recId) {
+    editRecordOriginal(projId, recId);
+
+    const allowed = getAllowedFieldsForCurrentUser(projId);
+    if (allowed === null) return; // Sem restrição customizada
+
+    const p = db.projects.find((x) => String(x.id) === String(projId));
+    if (!p) return;
+
+    const modalEl = $('#modal');
+    if (!modalEl) return;
+
+    // Bloqueia todos os inputs/selects/textareas referentes aos campos não autorizados
+    p.fields.forEach((f) => {
+      if (!allowed.includes(f.id)) {
+        const inputs = modalEl.querySelectorAll(
+          `[name="${f.id}"], [name="field_${f.id}"], [data-field="${f.id}"], #field_${f.id}`
+        );
+        inputs.forEach((inp) => {
+          inp.disabled = true;
+          inp.title = 'Você não tem permissão para editar este campo neste projeto.';
+          inp.style.opacity = '0.65';
+          inp.style.cursor = 'not-allowed';
+        });
+      }
+    });
+  };
+}

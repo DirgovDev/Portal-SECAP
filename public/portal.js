@@ -140,7 +140,11 @@
 /* ---- Decisão de acesso ao sistema (aprovar / recusar) ---- */
 window.handleAccountRequestAction = function (id, action) {
   const requestId = Number(id);
-  if (!Number.isSafeInteger(requestId) || requestId < 1 || !['approve', 'reject'].includes(action)) {
+  if (
+    !Number.isSafeInteger(requestId) ||
+    requestId < 1 ||
+    !['approve', 'reject'].includes(action)
+  ) {
     notify('Cadastro ou ação inválida. Atualize a lista e tente novamente.');
     return;
   }
@@ -178,7 +182,9 @@ window.confirmAccountDecision = async function (requestId, action) {
     if (!response.ok) throw new Error(result.error || 'Não foi possível registrar a decisão.');
     closeModal();
     if (typeof window.loadAccountRequests === 'function') await window.loadAccountRequests();
-    notify(`Acesso de ${item?.name || 'a pessoa'} ${action === 'approve' ? 'aprovado' : 'recusado'}.`);
+    notify(
+      `Acesso de ${item?.name || 'a pessoa'} ${action === 'approve' ? 'aprovado' : 'recusado'}.`
+    );
   } catch (error) {
     closeModal();
     if (typeof window.loadAccountRequests === 'function') await window.loadAccountRequests();
@@ -225,18 +231,110 @@ window.setObrasAccess = async function (requestId, access) {
 
 // Seleção de projetos ao lado da permissão já existente.
 function projectAccessControl(item) {
- const all=item.project_scope==='all', ids=item.project_ids||[];
- return `<div class="access-projects"><small>Projetos permitidos</small><button type="button" class="btn" onclick="openProjectAccess(${Number(item.id)})">${all?'Todos os projetos':ids.length+' projeto(s) selecionado(s)'} <span aria-hidden="true">⌄</span></button></div>`;
+  const all = item.project_scope === 'all',
+    ids = item.project_ids || [];
+  return `<div class="access-projects"><small>Projetos permitidos</small><button type="button" class="btn" onclick="openProjectAccess(${Number(item.id)})">${all ? 'Todos os projetos' : ids.length + ' projeto(s) selecionado(s)'} <span aria-hidden="true">⌄</span></button></div>`;
 }
-window.openProjectAccess=function(id){
- const item=accountRequestsCache.find(x=>Number(x.id)===Number(id));if(!item)return;
- const all=item.project_scope==='all',ids=item.project_ids||[];
- modal('Projetos que o usuário pode acessar',projectScopeMarkup(db.projects,all,ids),`<button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" id="saveProjectAccess" onclick="saveProjectAccess(${id})">Salvar acesso</button>`);
+window.openProjectAccess = function (id) {
+  const item = accountRequestsCache.find((x) => Number(x.id) === Number(id));
+  if (!item) return;
+  const all = item.project_scope === 'all',
+    ids = item.project_ids || [];
+  modal(
+    'Projetos que o usuário pode acessar',
+    projectScopeMarkup(db.projects, all, ids),
+    `<button class="btn" onclick="closeModal()">Cancelar</button><button class="btn primary" id="saveProjectAccess" onclick="saveProjectAccess(${id})">Salvar acesso</button>`
+  );
 };
-window.toggleProjectChoices=function(){document.getElementById('projectChoices').hidden=new FormData(document.getElementById('projectScopeForm')).get('scope')==='all'};
-window.saveProjectAccess=async function(id){
- const f=new FormData(document.getElementById('projectScopeForm')),scope=f.get('scope'),ids=f.getAll('project_ids');const b=document.getElementById('saveProjectAccess');b.disabled=true;
- try{const res=await fetch('/api/account-requests/project-access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,scope,project_ids:scope==='all'?[]:ids})});const d=await res.json();if(!res.ok)throw Error(d.error);const item=accountRequestsCache.find(x=>Number(x.id)===Number(id));item.project_scope=scope;item.project_ids=scope==='all'?[]:ids;closeModal();renderAccountRequests();notify('Acesso aos projetos atualizado.');}catch(e){document.getElementById('projectScopeError').textContent=e.message;b.disabled=false}
+window.toggleProjectChoices = function () {
+  document.getElementById('projectChoices').hidden =
+    new FormData(document.getElementById('projectScopeForm')).get('scope') === 'all';
+};
+window.saveProjectAccess = async function (id) {
+  const f = new FormData(document.getElementById('projectScopeForm')),
+    scope = f.get('scope'),
+    ids = f.getAll('project_ids');
+  const b = document.getElementById('saveProjectAccess');
+  b.disabled = true;
+  try {
+    const res = await fetch('/api/account-requests/project-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, scope, project_ids: scope === 'all' ? [] : ids }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw Error(d.error);
+    const item = accountRequestsCache.find((x) => Number(x.id) === Number(id));
+    item.project_scope = scope;
+    item.project_ids = scope === 'all' ? [] : ids;
+    closeModal();
+    renderAccountRequests();
+    notify('Acesso aos projetos atualizado.');
+  } catch (e) {
+    document.getElementById('projectScopeError').textContent = e.message;
+    b.disabled = false;
+  }
 };
 
-function projectScopeMarkup(projects,all,ids){return `<p>Selecione um, vários ou todos os projetos. A permissão de visualizar ou editar continua sendo a definida ao lado.</p><form id="projectScopeForm"><fieldset class="project-scope-modes"><label><input type="radio" name="scope" value="all" ${all?'checked':''} onchange="toggleProjectChoices()"> Todos os projetos <small>Inclui novos projetos criados depois.</small></label><label><input type="radio" name="scope" value="selected" ${!all?'checked':''} onchange="toggleProjectChoices()"> Projetos selecionados</label></fieldset><div id="projectChoices" class="project-choices" ${all?'hidden':''}>${projects.length?projects.map(p=>`<label><input type="checkbox" name="project_ids" value="${esc(p.id)}" ${ids.includes(p.id)?'checked':''}><span>${esc(p.name||p.nome||'Projeto')}</span></label>`).join(''):'<p>Nenhum projeto cadastrado.</p>'}</div><p id="projectScopeError" role="status"></p></form>`;}
+function projectScopeMarkup(projects, all, ids) {
+  return `<p>Selecione um, vários ou todos os projetos. A permissão de visualizar ou editar continua sendo a definida ao lado.</p><form id="projectScopeForm"><fieldset class="project-scope-modes"><label><input type="radio" name="scope" value="all" ${all ? 'checked' : ''} onchange="toggleProjectChoices()"> Todos os projetos <small>Inclui novos projetos criados depois.</small></label><label><input type="radio" name="scope" value="selected" ${!all ? 'checked' : ''} onchange="toggleProjectChoices()"> Projetos selecionados</label></fieldset><div id="projectChoices" class="project-choices" ${all ? 'hidden' : ''}>${projects.length ? projects.map((p) => `<label><input type="checkbox" name="project_ids" value="${esc(p.id)}" ${ids.includes(p.id) ? 'checked' : ''}><span>${esc(p.name || p.nome || 'Projeto')}</span></label>`).join('') : '<p>Nenhum projeto cadastrado.</p>'}</div><p id="projectScopeError" role="status"></p></form>`;
+}
+
+/* ---- Tornar usuário administrador / remover administração ---- */
+window.openUserRole = function (requestId, role) {
+  const id = Number(requestId);
+  const item = (typeof accountRequestsCache !== 'undefined' ? accountRequestsCache : []).find(
+    (r) => Number(r.id) === id
+  );
+  if (!item || !['administrador', 'usuario'].includes(role)) {
+    notify('Usuário não encontrado. Atualize a lista e tente novamente.');
+    return;
+  }
+  const promote = role === 'administrador';
+  modal(
+    promote ? 'Tornar administrador' : 'Remover administração',
+    `<p style="margin:0 0 6px"><strong>${esc(item.name || 'Nome não informado')}</strong></p><p class="subtitle" style="margin:0 0 14px">${esc(item.email || '')}</p>` +
+      (promote
+        ? `<p style="margin:0 0 10px">Esta pessoa passará a ter <strong>acesso total</strong>: aprovar e recusar cadastros, definir permissões de outros usuários, editar qualquer projeto e campo, fazer backup e restaurar dados.</p><p class="subtitle" style="margin:0">Ela precisa sair e entrar novamente para que a mudança valha.</p>`
+        : `<p style="margin:0 0 10px">Esta pessoa volta a ser usuário comum, com acesso <strong>somente para visualizar</strong> e <strong>sem projetos liberados</strong>. Você poderá liberar edição, projetos e campos depois.</p>`),
+    `<button class="btn" type="button" onclick="closeModal()">Cancelar</button><button class="btn ${promote ? 'primary' : 'danger'}" type="button" id="userRoleBtn" onclick="confirmUserRole(${id}, '${role}')">${promote ? 'Tornar administrador' : 'Remover administração'}</button>`
+  );
+};
+
+window.confirmUserRole = async function (requestId, role) {
+  const id = Number(requestId);
+  const button = document.getElementById('userRoleBtn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Salvando…';
+  }
+  const item = (typeof accountRequestsCache !== 'undefined' ? accountRequestsCache : []).find(
+    (r) => Number(r.id) === id
+  );
+  try {
+    const response = await fetch('/api/account-requests/role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, role }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível alterar o perfil.');
+    closeModal();
+    if (typeof persist === 'function') {
+      persist(
+        role === 'administrador' ? 'Tornou usuário administrador' : 'Removeu administração',
+        item?.email || '',
+        role === 'administrador' ? 'Usuário' : 'Administrador',
+        role === 'administrador' ? 'Administrador' : 'Usuário'
+      );
+    }
+    if (typeof window.loadAccountRequests === 'function') await window.loadAccountRequests();
+    notify(
+      `${item?.name || 'A pessoa'} ${role === 'administrador' ? 'agora é administradora do sistema' : 'voltou a ser usuário comum'}.`,
+      'success'
+    );
+  } catch (error) {
+    closeModal();
+    notify(`Erro ao alterar o perfil: ${error.message}`, 'error');
+  }
+};
