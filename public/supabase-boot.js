@@ -19,6 +19,8 @@ const APP_SCRIPTS = [
   'search-suggest.js',
   'field-rename.js',
   'portal.js',
+  'weekly-log.js',
+  'report-export.js',
 ];
 
 function showBootError(message) {
@@ -274,13 +276,31 @@ async function handleApi(sb, path, init, search = '') {
       return jsonResponse(400, { error: result.error?.message || 'Usuário não encontrado.' });
     return jsonResponse(200, { ok: true });
   }
+  if (path === '/api/account-requests/role' && method === 'POST') {
+    const d = await readBody(init);
+    const id = Number(d.id);
+    if (!Number.isSafeInteger(id) || id < 1 || !['administrador', 'usuario'].includes(d.role)) {
+      return jsonResponse(400, { error: 'Usuário ou perfil inválido.' });
+    }
+    const result = await sb.rpc('secap_set_user_role', { request_id: id, new_role: d.role });
+    if (result.error) return jsonResponse(400, { error: result.error.message });
+    if (!result.data) {
+      return jsonResponse(404, { error: 'Usuário não encontrado ou ainda sem acesso aprovado.' });
+    }
+    return jsonResponse(200, { ok: true, role: d.role });
+  }
   if (path === '/api/account-requests/obras-access' && method === 'POST') {
     return updateObrasAccess(sb, await readBody(init));
   }
   if (path === '/api/obras/save' && method === 'POST') {
-    return saveObraApi(sb, await readBody(init));
+    return saveObraApi(sb, await readBody(init), admin.user, admin.role);
   }
   if (path === '/api/obras/batch-save' && method === 'POST') {
+    if (admin.role !== 'administrador') {
+      return jsonResponse(403, {
+        error: 'Somente o administrador pode importar ou atualizar várias obras de uma vez.',
+      });
+    }
     return batchSaveObrasApi(sb, await readBody(init));
   }
   if (path === '/api/obras/delete' && method === 'POST') {
@@ -578,12 +598,57 @@ function recordToObraRow(projectId, record) {
   };
 }
 
-async function saveObraApi(sb, data) {
-  const projectId = data.projectId;
-  const record = data.record;
-  if (!projectId || !record || !record.id) {
+async function saveObraApi(sb, data, authUser, authRole) {
+  const projectId = String(data.projectId || '');
+  const incoming = data.record;
+  if (!projectId || !incoming || !incoming.id) {
     return jsonResponse(400, { error: 'Projeto ou registro de obra inválido.' });
   }
+
+  let record = incoming;
+  if (authRole !== 'administrador') {
+    // A autorização é conferida no servidor; desabilitar inputs no navegador não é suficiente.
+    const { data: stored, error: stateError } = await sb.rpc('secap_read_state');
+    if (stateError || !stored) {
+      return jsonResponse(500, { error: 'Não foi possível validar as permissões de campos.' });
+    }
+    const project = (stored.projects || []).find((item) => String(item.id) === projectId);
+    if (!project) return jsonResponse(403, { error: 'Você não tem acesso a este projeto.' });
+
+    const profile = await sb.from('profiles').select('email').eq('id', authUser.id).maybeSingle();
+    if (profile.error)
+      return jsonResponse(500, { error: 'Não foi possível identificar seu usuário.' });
+    const email = String(profile.data?.email || authUser.email || '')
+      .trim()
+      .toLowerCase();
+    const rules = stored.fieldPermissions?.[email]?.[projectId];
+    const allowed = Array.isArray(rules) ? new Set(rules.map(String)) : new Set();
+
+    if (!allowed.size) {
+      return jsonResponse(403, {
+        error:
+          'Nenhum campo foi liberado para edição neste projeto. Solicite autorização ao administrador.',
+      });
+    }
+
+    // Em edição, recupera o registro original e só aplica os campos autorizados.
+    const existing = await sb.from('obras').select('*').eq('id', String(incoming.id)).maybeSingle();
+    if (existing.error) return jsonResponse(500, { error: 'Não foi possível validar a obra.' });
+    if (existing.data && String(existing.data.project_id) !== projectId) {
+      return jsonResponse(403, { error: 'A obra não pertence a este projeto.' });
+    }
+
+    const fields = Array.isArray(project.fields) ? project.fields : [];
+    const original = existing.data ? obraRowToRecord(existing.data) : { id: String(incoming.id) };
+    record = { ...original, id: String(incoming.id) };
+    for (const field of fields) {
+      const fieldId = String(field.id);
+      if (allowed.has(fieldId) && Object.prototype.hasOwnProperty.call(incoming, fieldId)) {
+        record[fieldId] = incoming[fieldId];
+      }
+    }
+  }
+
   const row = recordToObraRow(projectId, record);
   const { error } = await sb.from('obras').upsert(row);
   if (error) {
@@ -847,6 +912,7 @@ async function bootCloud(config) {
     if (['administrador', 'usuario'].includes(profile.data?.role)) {
       active = true;
       email = profile.data.email || existing.data.user.email || '';
+      window.SECAP_PROFILE_NAME = String(profile.data.name || '').trim();
       if (profile.data.role === 'usuario') {
         window.SECAP_MEMBER = {
           id: 'member',
@@ -873,6 +939,10 @@ async function bootCloud(config) {
     if (stored.error)
       throw new Error('Aplique supabase/security/project_access.sql. ' + stored.error.message);
     state = stored.data;
+    if (!window.SECAP_MEMBER && window.SECAP_PROFILE_NAME && Array.isArray(state?.users)) {
+      const currentAdmin = state.users.find((user) => user.id === 'admin');
+      if (currentAdmin) currentAdmin.name = window.SECAP_PROFILE_NAME;
+    }
     window.SECAP_PROJECTS_BASE = JSON.parse(JSON.stringify(state?.projects || []));
 
     if (state && Array.isArray(state.projects)) {

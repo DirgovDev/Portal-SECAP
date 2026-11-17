@@ -221,8 +221,9 @@ const badge = (s) => {
 };
 const late = (r) => r.prazo && r.prazo < today() && r.status !== 'Concluído';
 
-function persist(action, where, before = '', after = '') {
-  if (action)
+function persist(action, where, before = '', after = '', field = '', serverRecorded = false) {
+  auditLoaded = false;
+  if (action && !serverRecorded)
     db.logs.unshift({
       id: uid(),
       at: new Date().toISOString(),
@@ -231,10 +232,13 @@ function persist(action, where, before = '', after = '') {
       project: where?.id || '',
       where: where?.name || String(where || 'Portal'),
       action,
+      field: field || (action?.startsWith('Alterou ') ? action.slice(8) : ''),
+      projectName: where?.name || '',
       before,
       after,
     });
-  if (window.SECAP_AUTH) queueSave(db);
+  if (window.SECAP_AUTH) return queueSave(db);
+  return Promise.resolve(true);
 }
 
 let toastTimer = null;
@@ -271,7 +275,7 @@ const navs = [
   ['solicitacoes', 'Solicitações', 'link'],
   ['profile', 'Meu perfil', 'user'],
   ['notes', 'Minhas anotações', 'note'],
-  ['history', 'Registros de alteração', 'history'],
+  ['history', 'Auditoria', 'history'],
   ['admin', 'Administração', 'shield'],
 ];
 
@@ -293,6 +297,9 @@ function openSolicitacoes() {
 }
 
 function go(t, id = '') {
+  if ((t === 'history' || t === 'weekly') && !isSysAdmin())
+    return notify('Auditoria disponível apenas para administradores.', 'error');
+  if (t === 'weekly' && typeof loadWeeklyLog === 'function') queueMicrotask(loadWeeklyLog);
   tableLimit = 50;
   tab = t;
   projectId = id;
@@ -458,7 +465,9 @@ function render() {
   const u = me(),
     allowed = (n) =>
       ['profile', 'notes', 'solicitacoes'].includes(n) ||
-      (n === 'admin' ? isSysAdmin() : u.role === 'Administrador' || u.tabs.includes(n));
+      (['admin', 'history', 'weekly'].includes(n)
+        ? isSysAdmin()
+        : u.role === 'Administrador' || u.tabs.includes(n));
   if (!allowed(tab)) tab = 'profile';
   $('#app').innerHTML =
     `<div class="stripe"></div><div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img class="brand-logo" src="logo-negative.png" alt="Prefeitura de Goiânia"></div><div class="navlabel">GESTÃO E ACOMPANHAMENTO</div>${navs
@@ -767,7 +776,7 @@ function editRecord(pid, rid = '') {
         <button class="btn" type="button" onclick="closeFullscreenDetail()">${icon('arrow')} Voltar às obras</button>
         <div>
           <span class="eyebrow">${esc(p.name)}</span>
-          <h1 style="margin:0; font-size:20px; color:#0f172a; font-weight:700;">${esc(r.nome || Object.values(r)[1] || 'Registro')}</h1>
+          <h1 class="obra-detail-title" title="${esc(r.nome || Object.values(r)[1] || 'Registro')}">${esc(r.nome || Object.values(r)[1] || 'Registro')}</h1>
         </div>
       </div>
       <div class="actions" style="display:flex; gap:10px;">
@@ -1689,11 +1698,9 @@ function projectView() {
       esc(p.name),
       esc(p.description),
       btn('Exportar', `openExport('${p.id}')`, 'download') +
-        (canEdit(p)
-          ? btn('Importar', `openImport('${p.id}')`, 'upload') +
-            btn('Personalizar campos', `editFields('${p.id}')`, 'edit') +
-            btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary')
-          : '')
+        (isSysAdmin() && canEdit(p) ? btn('Importar', `openImport('${p.id}')`, 'upload') : '') +
+        (isSysAdmin() ? btn('Personalizar campos', `editFields('${p.id}')`, 'edit') : '') +
+        (canEdit(p) ? btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary') : '')
     ) +
     `<div class="stats">${stat(
       'OBRAS CADASTRADAS',
@@ -1912,15 +1919,29 @@ function kanban() {
   );
 }
 
+// Permissão por campo definida pelo administrador (Administração > Permissões por campo).
+// Sem fid: pergunta se o usuário tem ao menos um campo liberado no projeto.
+function memberFieldAllowed(pid, fid) {
+  if (typeof getAllowedFieldsForCurrentUser !== 'function') return isSysAdmin();
+  const allowed = getAllowedFieldsForCurrentUser(pid);
+  if (allowed === null) return true;
+  return fid == null ? allowed.length > 0 : allowed.includes(String(fid));
+}
+
 function moveRecord(pid, rid, val) {
   const p = db.projects.find((p) => p.id === pid);
   if (!p || !canEdit(p)) return notify('Edição não permitida.');
   const f = p.fields.find((f) => f.id === kanbanField);
   if (!f?.options.includes(val)) return notify('Essa opção não existe neste projeto.');
+  if (!memberFieldAllowed(pid, kanbanField))
+    return notify(
+      `Você não tem permissão para alterar o campo "${f.name}" neste projeto.`,
+      'error'
+    );
   const r = p.records.find((r) => r.id === rid),
     before = r[kanbanField];
   r[kanbanField] = val;
-  persist(`Alterou ${f.name}`, p, before, val);
+  persist(`Alterou ${f.name}`, p, before, val, f.name, !!window.SECAP_OBRAS_BACKEND);
   if (window.SECAP_OBRAS_BACKEND) {
     window.SECAP_OBRAS_BACKEND.saveObra(p.id, r);
   }
@@ -2205,38 +2226,355 @@ function notes() {
   );
 }
 
-function history() {
-  const logs = db.logs.filter(
-    (l) =>
-      canManage() || (l.project ? visible().some((p) => p.id === l.project) : l.user === session)
+let auditLoaded = false,
+  auditLoading = false,
+  auditRows = [],
+  auditError = '';
+let auditView = 'recent',
+  auditDateMode = 'all',
+  auditStart = '',
+  auditEnd = '',
+  auditRecovering = false;
+let auditPage = 0,
+  auditCursors = [null],
+  auditNextCursor = null,
+  auditHasMore = false;
+let auditPeriodStart = '',
+  auditPeriodEnd = '',
+  auditAvailableStart = '',
+  auditAvailableEnd = '',
+  auditArchiveEnd = '',
+  auditRequest = 0;
+function resetAuditPages() {
+  auditPage = 0;
+  auditCursors = [null];
+  auditNextCursor = null;
+  auditLoaded = false;
+}
+async function loadAuditLogs() {
+  if (!isSysAdmin()) return;
+  const request = ++auditRequest,
+    cursor = auditCursors[auditPage];
+  auditLoading = true;
+  auditError = '';
+  auditRows = [];
+  const args = {
+    p_view: auditView,
+    p_start: auditDateMode === 'selected' ? auditStart : null,
+    p_end: auditDateMode === 'selected' ? auditEnd : null,
+    p_before_at: cursor?.at || null,
+    p_before_id: cursor?.id || null,
+    p_archive_end: auditView === 'archive' ? auditArchiveEnd || null : null,
+  };
+  if (tab === 'history') render();
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    if (typeof saveChain !== 'undefined') await saveChain;
+    if (request !== auditRequest) return;
+    const result = await window.sb.rpc('secap_audit_page', args);
+    if (request !== auditRequest || !isSysAdmin()) return;
+    if (result.error) throw result.error;
+    if (!Array.isArray(result.data?.rows)) throw new Error('Resposta de auditoria inválida.');
+    auditRows = result.data.rows;
+    auditHasMore = !!result.data.hasMore;
+    auditNextCursor = result.data.nextCursor;
+    auditPeriodStart = result.data.periodStart || '';
+    auditPeriodEnd = result.data.periodEnd || '';
+    auditAvailableStart = result.data.availableStart || '';
+    auditAvailableEnd = result.data.availableEnd || '';
+    auditAvailableDates = Array.isArray(result.data.availableDates)
+      ? result.data.availableDates
+      : [];
+    auditPicker = '';
+  } catch (error) {
+    if (request !== auditRequest) return;
+    auditRows = [];
+    auditHasMore = false;
+    auditError =
+      'Não foi possível consultar a auditoria. Verifique a conexão e aplique o arquivo atualizado supabase/security/audit_admin.sql. Detalhe: ' +
+      String(error?.message || error);
+  } finally {
+    if (request === auditRequest) {
+      auditLoading = false;
+      auditLoaded = true;
+      if (tab === 'history' && isSysAdmin()) render();
+    }
+  }
+}
+function refreshAuditLogs() {
+  resetAuditPages();
+  return loadAuditLogs();
+}
+function changeAuditPage(direction) {
+  if (auditLoading) return;
+  if (direction > 0 && auditHasMore) {
+    auditCursors[auditPage + 1] = auditNextCursor;
+    auditPage++;
+  } else if (direction < 0 && auditPage > 0) auditPage--;
+  else return;
+  auditLoaded = false;
+  loadAuditLogs();
+}
+function auditValue(value) {
+  if (value === undefined || value === null || value === '') return '—';
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+// Criação/exclusão de obra guardam a obra inteira; na tabela mostra um resumo.
+function auditObraValue(entry, value) {
+  if (entry && entry.eventId && !entry.fieldId && value && typeof value === 'object')
+    return `Dados da obra (${Object.keys(value).length} campos)`;
+  return auditValue(value);
+}
+function auditShortDate(value, year = false) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return '—';
+  const [y, m, d] = value.split('-');
+  return `${d}/${m}${year ? '/' + y : ''}`;
+}
+function auditRangeLabel(start, end) {
+  const differentYear = start?.slice(0, 4) !== end?.slice(0, 4);
+  return `${auditShortDate(start, differentYear)} – ${auditShortDate(end, differentYear)}`;
+}
+function setAuditView(view) {
+  if (!isSysAdmin()) return;
+  auditView = view === 'archive' ? 'archive' : 'recent';
+  auditArchiveEnd = '';
+  auditStart = '';
+  auditEnd = '';
+  auditDateMode = 'all';
+  auditPeriodStart = '';
+  auditPeriodEnd = '';
+  auditAvailableStart = '';
+  auditAvailableEnd = '';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function shiftAuditArchive(direction) {
+  if (auditView !== 'archive' || !auditPeriodEnd || auditLoading) return;
+  const day = new Date(auditPeriodEnd + 'T12:00:00Z');
+  day.setUTCDate(day.getUTCDate() + 40 * direction);
+  auditArchiveEnd = day.toISOString().slice(0, 10);
+  auditStart = '';
+  auditEnd = '';
+  auditDateMode = 'all';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function applyAuditDates(form) {
+  const data = new FormData(form),
+    start = String(data.get('start') || ''),
+    end = String(data.get('end') || '');
+  if (
+    !start ||
+    !end ||
+    start > end ||
+    start < auditPeriodStart ||
+    end > auditPeriodEnd ||
+    !auditAvailableDates.includes(start) ||
+    !auditAvailableDates.includes(end)
+  )
+    return notify('Selecione datas válidas dentro do período exibido.', 'error');
+  auditStart = start;
+  auditEnd = end;
+  auditDateMode = 'selected';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function showAllAuditDates() {
+  auditDateMode = 'all';
+  auditStart = '';
+  auditEnd = '';
+  resetAuditPages();
+  loadAuditLogs();
+}
+let auditAvailableDates = [],
+  auditPicker = '',
+  auditPickerMonth = '';
+function auditDateControl(field, label, value) {
+  return `<div class="field audit-calendar-field"><label>${label}</label><input type="hidden" id="${field}" name="${field === 'auditStart' ? 'start' : 'end'}" value="${esc(value)}"><button class="audit-date-trigger" type="button" aria-label="${label}" aria-haspopup="dialog" aria-expanded="${auditPicker === field}" onclick="toggleAuditCalendar('${field}')"><span id="${field}Display">${value ? auditShortDate(value, true) : 'dd/mm/aaaa'}</span>${icon('calendar')}</button><div id="${field}Calendar" class="audit-calendar-host"></div></div>`;
+}
+function toggleAuditCalendar(field) {
+  if (auditLoading) return;
+  const old = auditPicker;
+  document.querySelectorAll('.audit-calendar-host').forEach((el) => (el.innerHTML = ''));
+  document
+    .querySelectorAll('.audit-date-trigger')
+    .forEach((el) => el.setAttribute('aria-expanded', 'false'));
+  if (old === field) {
+    auditPicker = '';
+    return;
+  }
+  auditPicker = field;
+  const value =
+    document.getElementById(field)?.value ||
+    (field === 'auditStart' ? auditAvailableStart : auditAvailableEnd) ||
+    auditPeriodStart;
+  auditPickerMonth = value.slice(0, 7);
+  renderAuditCalendar();
+}
+function renderAuditCalendar() {
+  const host = document.getElementById(auditPicker + 'Calendar');
+  if (!host) return;
+  const [year, month] = auditPickerMonth.split('-').map(Number),
+    first = new Date(Date.UTC(year, month - 1, 1, 12));
+  if (Number.isNaN(first.getTime())) return;
+  const days = new Date(Date.UTC(year, month, 0, 12)).getUTCDate(),
+    offset = first.getUTCDay();
+  const available = new Set(auditAvailableDates),
+    selected = document.getElementById(auditPicker)?.value || '';
+  const prev = auditPickerMonth <= auditPeriodStart.slice(0, 7),
+    next = auditPickerMonth >= auditPeriodEnd.slice(0, 7);
+  host.innerHTML = `<div class="audit-calendar" role="dialog" aria-label="Selecionar ${auditPicker === 'auditStart' ? 'data inicial' : 'data final'}" onkeydown="if(event.key==='Escape')closeAuditCalendar()"><div class="audit-calendar-head"><button type="button" aria-label="Mês anterior" ${prev ? 'disabled' : ''} onclick="moveAuditCalendar(-1)">‹</button><strong>${esc(first.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }))}</strong><button type="button" aria-label="Próximo mês" ${next ? 'disabled' : ''} onclick="moveAuditCalendar(1)">›</button></div><div class="audit-calendar-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((x) => `<span>${x}</span>`).join('')}</div><div class="audit-calendar-days">${'<span></span>'.repeat(offset)}${Array.from(
+    { length: days },
+    (_, i) => {
+      const day = `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+      const enabled = day >= auditPeriodStart && day <= auditPeriodEnd && available.has(day);
+      return `<button type="button" class="${selected === day ? 'is-selected' : ''}" aria-label="${auditShortDate(day, true)}" ${enabled ? '' : 'disabled'} ${selected === day ? 'aria-pressed="true"' : ''} onclick="selectAuditDate('${day}')">${i + 1}</button>`;
+    }
+  ).join(
+    ''
+  )}</div><button class="audit-calendar-close" type="button" onclick="closeAuditCalendar()">Fechar</button></div>`;
+  host.previousElementSibling?.setAttribute('aria-expanded', 'true');
+}
+function moveAuditCalendar(delta) {
+  const [year, month] = auditPickerMonth.split('-').map(Number),
+    d = new Date(Date.UTC(year, month - 1 + delta, 1, 12));
+  const next = d.toISOString().slice(0, 7);
+  if (next < auditPeriodStart.slice(0, 7) || next > auditPeriodEnd.slice(0, 7)) return;
+  auditPickerMonth = next;
+  renderAuditCalendar();
+}
+function selectAuditDate(day) {
+  if (!auditAvailableDates.includes(day) || day < auditPeriodStart || day > auditPeriodEnd) return;
+  const field = auditPicker,
+    input = document.getElementById(field),
+    display = document.getElementById(field + 'Display');
+  if (input) input.value = day;
+  if (display) display.textContent = auditShortDate(day, true);
+  closeAuditCalendar();
+  document.getElementById(field)?.nextElementSibling?.focus();
+}
+function closeAuditCalendar() {
+  document.querySelectorAll('.audit-calendar-host').forEach((el) => (el.innerHTML = ''));
+  document
+    .querySelectorAll('.audit-date-trigger')
+    .forEach((el) => el.setAttribute('aria-expanded', 'false'));
+  auditPicker = '';
+}
+document.addEventListener('click', (e) => {
+  if (auditPicker && !e.target.closest('.audit-calendar-field')) closeAuditCalendar();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && auditPicker) closeAuditCalendar();
+});
+
+function requestAuditRecovery(eventId) {
+  if (!isSysAdmin() || auditRecovering) return;
+  const l = auditRows.find((l) => l.eventId === eventId);
+  if (!l?.recoverable || l.recovered)
+    return notify('Esta alteração não pode ser recuperada automaticamente.', 'error');
+  modal(
+    'Recuperar informação anterior',
+    `<div class="audit-recovery-summary"><p>Você está prestes a substituir o valor atual pelo valor anterior do campo indicado.</p>
+    <p><b>Projeto:</b> ${esc(l.projectName)}<br><b>Obra:</b> ${esc(l.recordName || l.recordId)}<br><b>Campo:</b> ${esc(l.field)}</p>
+    <div><b>Valor atual registrado:</b><p>${esc(auditValue(l.after))}</p></div>
+    <div><b>Valor que será recuperado:</b><p>${esc(auditValue(l.before))}</p></div>
+    <p>A recuperação identificará seu usuário na auditoria e manterá a alteração original no histórico.</p></div>`,
+    btn('Cancelar', 'closeModal()', 'close') +
+      btn(
+        'Concordo em voltar',
+        `confirmAuditRecovery('${esc(eventId)}',this)`,
+        'history',
+        'primary'
+      )
   );
+}
+async function confirmAuditRecovery(eventId, button) {
+  if (!isSysAdmin() || auditRecovering) return;
+  auditRecovering = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Recuperando…';
+  }
+  try {
+    if (!window.sb) throw new Error('Conexão indisponível.');
+    if (typeof saveChain !== 'undefined') await saveChain;
+    const result = await window.sb.rpc('secap_recover_audit', {
+      event_id: eventId,
+      agreement: true,
+    });
+    if (result.error) throw result.error;
+    if (!result.data?.ok || !result.data.obra)
+      throw new Error('O servidor não confirmou a recuperação.');
+    const row = result.data.obra;
+    const p = db.projects.find((p) => p.id === row.project_id);
+    if (p) {
+      const i = p.records.findIndex((r) => String(r.id) === String(row.id));
+      const restored = window.SECAP_OBRAS_BACKEND.obraRowToRecord(row);
+      if (i >= 0) p.records[i] = restored;
+    }
+    closeModal();
+    resetAuditPages();
+    await loadAuditLogs();
+    notify('Informação anterior recuperada. A recuperação foi registrada na auditoria.', 'success');
+  } catch (error) {
+    notify('Não foi possível recuperar: ' + String(error?.message || error), 'error');
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Concordo em voltar';
+    }
+  } finally {
+    auditRecovering = false;
+  }
+}
+function history() {
+  if (!isSysAdmin())
+    return empty('Acesso restrito', 'Auditoria disponível apenas para administradores.');
+  if (!auditLoaded && !auditLoading) queueMicrotask(loadAuditLogs);
+  const logs = auditRows,
+    archived = auditView === 'archive';
   return (
     head(
-      'TRANSPARÊNCIA DO TRABALHO',
+      'AUDITORIA DO SISTEMA',
       'Registros de alteração',
-      'Saiba quem alterou, quando alterou e o que mudou.'
+      'Saiba quem alterou, quando alterou e o que mudou.',
+      btn(
+        archived ? 'Registros recentes' : 'Histórico arquivado',
+        `setAuditView('${archived ? 'recent' : 'archive'}')`,
+        'folder'
+      ) +
+        btn('Baixar relatório', "openReportExport('audit')", 'download') +
+        btn('Atualizar', 'refreshAuditLogs()', 'history')
     ) +
-    `<div class="banner">${icon(
-      'history'
-    )}<span>Histórico de alterações registrado no servidor.</span></div><section class="panel"><div class="tablewrap"><table><thead><tr><th>Data e hora</th><th>Usuário</th><th>Ação / local</th><th>Antes</th><th>Depois</th></tr></thead><tbody>${logs
-      .map(
-        (l) =>
-          `<tr><td>${new Date(l.at).toLocaleString('pt-BR')}</td><td>${esc(
-            l.who
-          )}</td><td><strong>${esc(l.action)}</strong><div class="desc">${esc(
-            l.where
-          )}</div></td><td style="white-space:normal;max-width:220px">${esc(
-            l.before || '—'
-          )}</td><td style="white-space:normal;max-width:220px">${esc(l.after || '—')}</td></tr>`
-      )
-      .join('')}</tbody></table></div>${
-      logs.length
-        ? ''
-        : empty(
-            'Nenhuma alteração registrada',
-            'Crie ou edite uma obra para ver seu histórico aqui.'
-          )
-    }</section>`
+    `<section class="panel audit-date-panel"><div class="panelbody audit-filter-row">
+    <div class="audit-period-summary"><h2>${archived ? 'Histórico arquivado' : 'Registros recentes'}</h2>
+    <p class="subtitle">${auditAvailableStart ? `Datas com registros: ${esc(auditShortDate(auditAvailableStart, true))} – ${esc(auditShortDate(auditAvailableEnd, true))}` : 'Nenhum registro neste período.'}</p>
+    ${archived ? `<div class="actions audit-period-actions"><button class="textbtn" ${auditLoading ? 'disabled' : ''} onclick="shiftAuditArchive(-1)">← 40 dias anteriores</button><button class="textbtn" ${auditLoading ? 'disabled' : ''} onclick="shiftAuditArchive(1)">40 dias seguintes →</button></div>` : ''}</div>
+    <div class="audit-date-controls"><form class="audit-date-form" onsubmit="event.preventDefault();applyAuditDates(this)">
+    ${auditDateControl('auditStart', 'Data inicial', auditStart)}${auditDateControl('auditEnd', 'Data final', auditEnd)}
+    <button class="btn primary" type="submit" ${auditLoading ? 'disabled' : ''}>Ver datas selecionadas</button><button class="btn" type="button" onclick="showAllAuditDates()" ${auditLoading ? 'disabled' : ''}>Ver tudo</button>
+    </form></div></div></section>
+    ${!window.SECAP_PROFILE_NAME || String(window.SECAP_PROFILE_NAME).includes('@') ? `<div class="banner" role="status"><span>O nome da sua conta ainda não está preenchido no servidor.</span>${btn('Preencher meu nome', "go('profile')", 'user')}</div>` : ''}
+    ${auditError ? `<div class="banner" role="alert">${esc(auditError)}</div>` : ''}
+    ${auditLoading || !auditLoaded ? '<p role="status">Consultando registros…</p>' : ''}
+    <section class="panel audit-panel"><div class="tablewrap"><table aria-label="Registros de alteração"><thead><tr>
+    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Recuperação</th>
+    </tr></thead><tbody>${logs
+      .map((l) => {
+        const project = db.projects.find((p) => p.id === l.project);
+        const field = l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
+        const projectName =
+          l.projectName || project?.name || (l.project ? l.where || l.project : '—');
+        const at = new Date(l.at);
+        const recovery = l.recovered
+          ? '<span>Recuperado</span>'
+          : l.eventId && l.recoverable && l.fieldId
+            ? btn('Recuperar', `requestAuditRecovery('${esc(l.eventId)}')`, 'history')
+            : '<span title="Este registro não possui identificação segura da obra e do campo para recuperação automática.">Indisponível</span>';
+        return `<tr><td>${esc(Number.isNaN(at.getTime()) ? '—' : at.toLocaleString('pt-BR'))}</td><td>${esc(l.who || 'Não informado')}</td><td>${esc(l.action || '—')}${l.recoveredFrom ? `<div class="desc">Recuperação do registro ${esc(l.recoveredFrom)}</div>` : ''}</td><td>${esc(projectName)}${l.recordName ? `<div class="desc">${esc(l.recordName)}</div>` : ''}</td><td>${esc(field)}</td><td>${esc(auditObraValue(l, l.before))}</td><td>${esc(auditObraValue(l, l.after))}</td><td>${recovery}</td></tr>`;
+      })
+      .join(
+        ''
+      )}</tbody></table></div>${logs.length ? '' : empty('Nenhuma alteração neste período', 'Escolha outro intervalo ou consulte o histórico arquivado.')}<div class="audit-pagination"><button class="btn" ${auditLoading || auditPage === 0 ? 'disabled' : ''} onclick="changeAuditPage(-1)">← Anterior</button><span>Página ${auditPage + 1}</span><button class="btn" ${auditLoading || !auditHasMore ? 'disabled' : ''} onclick="changeAuditPage(1)">Próxima →</button></div></section>`
   );
 }
 
@@ -2261,12 +2599,34 @@ function switchProfile() {
   return false;
 }
 
-function saveProfile(form) {
-  const old = me().name;
-  me().name = new FormData(form).get('name').trim();
-  persist('Atualizou o perfil', 'Meu perfil', old, me().name);
-  render();
-  notify('Perfil atualizado.');
+let profileSaving = false;
+async function saveProfile(form) {
+  if (profileSaving || !me()) return;
+  const name = String(new FormData(form).get('name') || '').trim();
+  if (!name || name.length > 120)
+    return notify('Informe seu nome com até 120 caracteres.', 'error');
+  const button = form.querySelector('button');
+  profileSaving = true;
+  if (button) button.disabled = true;
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    const result = await window.sb.rpc('secap_update_my_name', { new_name: name });
+    if (result.error) throw result.error;
+    if (result.data?.name !== name) throw new Error('O servidor não confirmou seu nome.');
+    const old = me().name;
+    me().name = name;
+    window.SECAP_PROFILE_NAME = name;
+    if (window.SECAP_MEMBER) window.SECAP_MEMBER.name = name;
+    await persist('Atualizou o perfil', 'Meu perfil', old, name);
+    auditLoaded = false;
+    render();
+    notify('Nome salvo na sua conta e atualizado na auditoria.', 'success');
+  } catch (error) {
+    notify('Não foi possível salvar seu nome: ' + String(error?.message || error), 'error');
+  } finally {
+    profileSaving = false;
+    if (button) button.disabled = false;
+  }
 }
 
 function admin() {
@@ -2317,6 +2677,19 @@ function obrasAccessControl(item) {
   </label>`;
 }
 
+// Botão de promover/rebaixar. A própria conta não pode se alterar (o banco também recusa).
+function roleControl(item) {
+  const id = Number(item.id);
+  const mine =
+    String(item.email || '').toLowerCase() === String(window.SECAP_EMAIL || '').toLowerCase();
+  if (item.profile_role === 'administrador') {
+    return mine
+      ? '<span class="role-note">Sua conta</span>'
+      : `<button type="button" class="btn sm role-btn is-demote" onclick="openUserRole(${id}, 'usuario')">Remover administração</button>`;
+  }
+  return `<button type="button" class="btn sm role-btn is-promote" onclick="openUserRole(${id}, 'administrador')">Tornar administrador</button>`;
+}
+
 function renderAccountRequests() {
   const root = document.getElementById('accountRequests');
   if (!root) return;
@@ -2347,9 +2720,13 @@ function renderAccountRequests() {
     (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'usuario'
   );
   const canEditCount = approvedUsers.filter((item) => item.obras_access === 'editar').length;
-  const approvedSummary = approvedUsers.length
-    ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
-    : 'Acesso aprovado';
+  const adminCount = requests.filter(
+    (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'administrador'
+  ).length;
+  const approvedSummary =
+    (approvedUsers.length
+      ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
+      : 'Acesso aprovado') + (adminCount ? ` · ${adminCount} administrador(es)` : '');
 
   const dateLabel = (value) => {
     if (!value) return '—';
@@ -2397,8 +2774,10 @@ function renderAccountRequests() {
         pending
           ? `<button type="button" class="btn primary sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'approve')">Aprovar</button><button type="button" class="btn danger sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'reject')">Recusar</button>`
           : status === 'aprovada' && item.profile_role === 'usuario'
-            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}</div>`
-            : ''
+            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}${roleControl(item)}</div>`
+            : status === 'aprovada' && item.profile_role === 'administrador'
+              ? `<div class="access-controls-pair"><span class="role-badge">Administrador</span>${roleControl(item)}</div>`
+              : ''
       }</div>
     </article>`;
     })
@@ -2737,6 +3116,10 @@ const typeNames = {
 };
 
 function editFields(pid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2778,6 +3161,10 @@ function editFields(pid) {
 }
 
 function fieldForm(pid, fid = '') {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid),
     f = p.fields.find((f) => f.id === fid);
   modal(
@@ -2805,6 +3192,10 @@ function fieldForm(pid, fid = '') {
 }
 
 function saveField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   const data = new FormData($('#fieldForm')),
@@ -2831,13 +3222,17 @@ function saveField(pid, fid) {
   const before = old?.name || '';
   if (old) Object.assign(old, f);
   else p.fields.push(f);
-  persist('Personalizou campo', p, before, f.name);
+  persist('Personalizou campo', p, before, f.name, f.name);
   editFields(pid);
   render();
   notify('Campo salvo e conectado às obras.');
 }
 
 function removeField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2854,20 +3249,22 @@ function confirmRemoveField(pid, fid) {
   const f = p.fields.find((f) => f.id === fid);
   p.fields = p.fields.filter((f) => f.id !== fid);
   p.records.forEach((r) => delete r[fid]);
-  persist('Removeu campo', p, f.name, 'Removido');
+  persist('Removeu campo', p, f.name, 'Removido', f.name);
   editFields(pid);
   render();
 }
 
 function inputField(f, value, disabled) {
   const currentValue = value === null || value === undefined ? '' : String(value);
-  const attrs = `aria-label="${esc(f.name)}" name="${f.id}" ${f.required ? 'required' : ''} ${disabled ? 'disabled' : ''}`;
+  const attrs = `aria-label="${esc(f.name)}" name="${f.id}" data-original-value="${esc(currentValue)}" ${f.required ? 'required' : ''} ${disabled ? 'disabled' : ''}`;
   let input;
 
   if (f.type === 'long') {
     input = `<textarea ${attrs} rows="3">${esc(currentValue)}</textarea>`;
   } else if (f.type === 'select') {
-    const options = Array.isArray(f.options) ? f.options : [];
+    const options = Array.isArray(f.options) ? [...f.options] : [];
+    if (currentValue !== '' && !options.some((option) => String(option) === currentValue))
+      options.unshift(currentValue);
     input = `<select ${attrs}><option value="">Selecione...</option>${options
       .map(
         (option) =>
@@ -2875,7 +3272,7 @@ function inputField(f, value, disabled) {
       )
       .join('')}</select>`;
   } else if (f.type === 'boolean') {
-    input = `<select ${attrs}><option value="">Selecione...</option><option value="Sim" ${currentValue === 'Sim' ? 'selected' : ''}>Sim</option><option value="Não" ${currentValue === 'Não' ? 'selected' : ''}>Não</option></select>`;
+    input = `<select ${attrs}><option value="">Selecione...</option>${currentValue && !['Sim', 'Não'].includes(currentValue) ? `<option value="${esc(currentValue)}" selected>${esc(currentValue)}</option>` : ''}<option value="Sim" ${currentValue === 'Sim' ? 'selected' : ''}>Sim</option><option value="Não" ${currentValue === 'Não' ? 'selected' : ''}>Não</option></select>`;
   } else {
     const inputType =
       { date: 'date', number: 'number', currency: 'number', link: 'url' }[f.type] || 'text';
@@ -2924,7 +3321,7 @@ function editRecord(pid, rid = '') {
         <button class="btn" onclick="closeFullscreenDetail()">${icon('arrow')} Voltar às obras</button>
         <div>
           <span class="eyebrow">${esc(p.name)}</span>
-          <h1 style="margin:0; font-size:20px; color:#0f172a; font-weight:700;">${esc(r.nome || 'Registro')}</h1>
+          <h1 class="obra-detail-title" title="${esc(r.nome || 'Registro')}">${esc(r.nome || 'Registro')}</h1>
         </div>
       </div>
       <div class="actions" style="display:flex; gap:10px;">
@@ -2988,41 +3385,85 @@ function closeFullscreenDetail() {
 function saveRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
-  const data = new FormData($('#recordForm')),
+
+  const allowed =
+    typeof getAllowedFieldsForCurrentUser === 'function'
+      ? getAllowedFieldsForCurrentUser(p.id)
+      : isSysAdmin()
+        ? null
+        : [];
+
+  if (allowed !== null && (!Array.isArray(allowed) || allowed.length === 0)) {
+    return notify('Você não possui campos liberados para edição neste projeto.');
+  }
+
+  const form = $('#recordForm');
+  const data = new FormData(form),
     r = p.records.find((r) => r.id === rid),
     values = {};
+
   for (const f of p.fields) {
+    const isFieldAllowed = allowed === null || allowed.includes(f.id);
+
+    // Se o campo estiver bloqueado para este usuário:
+    // - Na edição (r existe), preserva o valor original do banco (evita apagar dado de input disabled ou burlado)
+    // - Na criação de novo registro, grava vazio
+    if (!isFieldAllowed) {
+      values[f.id] = r ? (r[f.id] ?? '') : '';
+      continue;
+    }
+
+    const control = form.elements.namedItem(f.id);
+    if (
+      r &&
+      (!data.has(f.id) ||
+        (control?.dataset && String(data.get(f.id)) === control.dataset.originalValue))
+    ) {
+      values[f.id] = r[f.id] ?? '';
+      continue;
+    }
     const value = data.get(f.id);
     values[f.id] = ['currency', 'number'].includes(f.type)
-      ? value === ''
+      ? value === '' || value === null
         ? ''
         : Number(value)
       : String(value || '').trim();
   }
+
   if (r) {
-    const changes = p.fields.filter((f) => String(r[f.id] ?? '') !== String(values[f.id] ?? ''));
+    const changes = p.fields.filter(
+      (f) =>
+        (allowed === null || allowed.includes(f.id)) &&
+        String(r[f.id] ?? '') !== String(values[f.id] ?? '')
+    );
+
     changes.forEach((f) => {
       const old = r[f.id];
       r[f.id] = values[f.id];
-      persist(`Alterou ${f.name}`, p, String(old ?? ''), String(values[f.id] ?? ''));
+      persist(`Alterou ${f.name}`, p, old, values[f.id], f.name, !!window.SECAP_OBRAS_BACKEND);
     });
-    if (window.SECAP_OBRAS_BACKEND) {
+
+    if (window.SECAP_OBRAS_BACKEND && changes.length > 0) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, r);
     }
   } else {
     const newRecord = { id: uid(), ...values };
     p.records.push(newRecord);
-    persist('Cadastrou obra', p, '', values.nome);
+    // Com o servidor ativo, a criação é registrada pela auditoria do banco (evita duplicar).
+    persist('Cadastrou obra', p, '', values.nome, '', !!window.SECAP_OBRAS_BACKEND);
     if (window.SECAP_OBRAS_BACKEND) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, newRecord);
     }
   }
+
   closeModal();
   render();
   notify('Obra salva. Calendário, Kanban e BI atualizados.');
 }
 
 function deleteRecord(pid, rid) {
+  if (!memberFieldAllowed(pid))
+    return notify('Você não possui campos liberados para editar este projeto.', 'error');
   modal(
     'Excluir esta obra?',
     `<p>A obra será removida do portal e de todos os painéis conectados.</p>`,
@@ -3033,7 +3474,7 @@ function deleteRecord(pid, rid) {
 
 async function confirmDeleteRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
-  if (!p || !canEdit(p)) return;
+  if (!p || !canEdit(p) || !memberFieldAllowed(pid)) return;
   const r = p.records.find((r) => r.id === rid);
   // Primeiro o banco: só tira a obra da tela se a exclusão realmente foi aceita.
   if (window.SECAP_OBRAS_BACKEND) {
@@ -3045,7 +3486,7 @@ async function confirmDeleteRecord(pid, rid) {
     }
   }
   p.records = p.records.filter((x) => x.id !== rid);
-  persist('Excluiu obra', p, r?.nome || '', 'Removida');
+  persist('Excluiu obra', p, r?.nome || '', 'Removida', '', !!window.SECAP_OBRAS_BACKEND);
   closeModal();
   render();
   notify('Obra excluída.');
