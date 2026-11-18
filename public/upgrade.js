@@ -653,11 +653,14 @@ function ensureProjectMilestones(p) {
 }
 
 const MILESTONE_STATUS = {
-  progress: { label: 'Em progresso', bg: '#00a3d7', color: '#ffffff', next: 'done' },
-  done: { label: 'Concluído', bg: '#268c48', color: '#ffffff', next: 'stuck' },
-  stuck: { label: 'Cancelado', bg: '#d63649', color: '#ffffff', next: 'canceled_black' },
-  canceled_black: { label: 'Cancelado', bg: '#181b20', color: '#ffffff', next: 'progress' },
+  progress: { label:'Em andamento', bg:'#007EFF', color:'#ffffff', next:'done' },
+  done: { label:'Concluído', bg:'#00DE94', color:'#003247', next:'started' },
+  started: { label:'Iniciado', bg:'#ffffff', color:'#003247', next:'canceled_black' },
+  canceled_black: { label:'Cancelado', bg:'#000000', color:'#ffffff', next:'paused' },
+  paused: { label:'Paralisado', bg:'#DC2626', color:'#ffffff', next:'planning' },
+  planning: { label:'Em planejamento', bg:'#FFBF00', color:'#003247', next:'progress' },
 };
+function msStatusKey(value) { return value==='stuck'?'canceled_black':Object.hasOwn(MILESTONE_STATUS,value)?value:'progress'; }
 
 const PHASE_PALETTE = ['#003856', '#f36e22', '#00a3d7', '#268c48'];
 
@@ -668,24 +671,13 @@ function getSystemUsersList() {
   return [];
 }
 
-function renderOwnerBadge(ownerId) {
+function renderOwnerBadge(ownerId, ownerName = '') {
   const users = getSystemUsersList();
   const u = users.find((x) => String(x.id || x.email) === String(ownerId));
-  if (!u) {
-    return `<div class="ms-avatar ms-avatar-empty" title="Atribuir responsável">+</div>`;
-  }
-  const name = u.name || u.full_name || u.email || 'Usuário';
-  if (u.avatar || u.photo_url) {
-    return `<img class="ms-avatar" src="${esc(u.avatar || u.photo_url)}" alt="${esc(name)}" title="${esc(name)}">`;
-  }
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join('')
-    .toUpperCase();
-  return `<div class="ms-avatar" title="${esc(name)}">${esc(initials)}</div>`;
+  const name=String(ownerName || u?.name || u?.full_name || u?.email || '').trim();
+  if(!name)return `<span class="ms-avatar ms-avatar-empty" title="Atribuir responsável">+</span>`;
+  const initials=name.split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();
+  return `<span class="ms-owner-display"><span class="ms-avatar" aria-hidden="true">${esc(initials)}</span><span class="ms-owner-name">${esc(name)}</span></span>`;
 }
 
 function biDetails(p) {
@@ -711,7 +703,7 @@ function biDetails(p) {
 
           const rowsHtml = items
             .map((item) => {
-              const st = MILESTONE_STATUS[item.status] || MILESTONE_STATUS.progress;
+              const statusKey = msStatusKey(item.status), st = MILESTONE_STATUS[statusKey];
               const pct = Math.max(0, Math.min(100, Number(item.progress) || 0));
               const barBg =
                 pct === 100 ? '#268c48' : 'linear-gradient(90deg, #003856 0%, #00a3d7 100%)';
@@ -727,17 +719,14 @@ function biDetails(p) {
                 />
               </div>
 
-              <div class="ms-cell ms-cell-owner" onclick="msOpenOwnerMenu(event, '${realProject.id}', '${phase.id}', '${item.id}')">
-                ${renderOwnerBadge(item.ownerId)}
-              </div>
+              <button type="button" class="ms-cell ms-cell-owner ms-owner-trigger" aria-label="Definir responsável do marco ${esc(item.title)}" ${canEdit(realProject)?'':'disabled'} onclick="msOpenOwnerMenu(event, '${realProject.id}', '${phase.id}', '${item.id}')">
+                ${renderOwnerBadge(item.ownerId, item.ownerName)}
+              </button>
 
               <div class="ms-cell">
-                <span
-                  class="ms-cell-status"
-                  style="background-color: ${st.bg}; color: ${st.color};"
-                  title="Clique para alternar o status"
-                  onclick="msCycleStatus('${realProject.id}', '${phase.id}', '${item.id}')"
-                >${st.label}</span>
+                <select class="ms-cell-status ms-status-select" aria-label="Status do marco ${esc(item.title)}" style="background-color:${st.bg};color:${st.color};border:1px solid ${statusKey==='started'?'#b8c7cf':st.bg}" ${canEdit(realProject)?'':'disabled'} onchange="msSetStatus('${realProject.id}','${phase.id}','${item.id}',this.value)">
+                  ${Object.entries(MILESTONE_STATUS).map(([key,value])=>`<option value="${key}" ${key===statusKey?'selected':''}>${value.label}</option>`).join('')}
+                </select>
               </div>
 
               <div class="ms-cell ms-cell-timeline" title="Clique na barra para ajustar o progresso (${pct}%)" onclick="msClickTimeline(event, '${realProject.id}', '${phase.id}', '${item.id}')">
@@ -896,16 +885,18 @@ window.msDeleteItem = function (projectId, phaseId, itemId) {
   }
 };
 
-window.msCycleStatus = function (projectId, phaseId, itemId) {
-  const p = msGetProject(projectId);
-  if (!p) return;
-  const phase = ensureProjectMilestones(p).find((x) => x.id === phaseId);
-  const item = phase?.items.find((x) => x.id === itemId);
-  if (!item) return;
-  const current = MILESTONE_STATUS[item.status] || MILESTONE_STATUS.progress;
-  item.status = current.next;
-  if (item.status === 'done' && item.progress < 100) item.progress = 100;
-  msCommit(p, 'Alterou status do marco');
+window.msSetStatus = function(projectId,phaseId,itemId,value) {
+ const p=msGetProject(projectId);if(!p||!canEdit(p)||!Object.hasOwn(MILESTONE_STATUS,value))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);if(!item)return;
+ const before=MILESTONE_STATUS[msStatusKey(item.status)].label;
+ if(msStatusKey(item.status)===value)return;
+ item.status=value;if(value==='done'&&item.progress<100)item.progress=100;
+ persist('Alterou status do marco no BI',p,before,MILESTONE_STATUS[value].label,'Status do marco · '+item.title);render();
+};
+window.msCycleStatus = function(projectId,phaseId,itemId) {
+ const p=msGetProject(projectId);if(!p)return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);
+ if(item)msSetStatus(projectId,phaseId,itemId,MILESTONE_STATUS[msStatusKey(item.status)].next);
 };
 
 window.msClickTimeline = function (ev, projectId, phaseId, itemId) {
@@ -924,46 +915,41 @@ window.msClickTimeline = function (ev, projectId, phaseId, itemId) {
   }
 };
 
-window.msOpenOwnerMenu = function (ev, projectId, phaseId, itemId) {
-  ev.stopPropagation();
-  const pop = document.getElementById('ms-owner-popover');
-  if (!pop) return;
-  const users = getSystemUsersList();
-  const rect = ev.currentTarget.getBoundingClientRect();
-
-  const opts = users
-    .map((u) => {
-      const uid = String(u.id || u.email);
-      const name = esc(u.name || u.full_name || u.email);
-      return `<div class="ms-pop-item" onclick="msSelectOwner('${projectId}', '${phaseId}', '${itemId}', '${esc(uid)}')">${name}</div>`;
-    })
-    .join('');
-
-  pop.innerHTML = `
-    <div class="ms-pop-item ms-pop-clear" onclick="msSelectOwner('${projectId}', '${phaseId}', '${itemId}', '')">Sem responsável</div>
-    ${opts || '<div class="ms-pop-empty" style="padding:8px 14px;font-size:12px;color:#676879;">Nenhum usuário encontrado</div>'}
-  `;
-  pop.style.display = 'block';
-  pop.style.top = rect.bottom + window.scrollY + 4 + 'px';
-  pop.style.left = rect.left + window.scrollX - 40 + 'px';
-
-  const closePop = () => {
-    pop.style.display = 'none';
-    document.removeEventListener('click', closePop);
-  };
-  setTimeout(() => document.addEventListener('click', closePop), 10);
+let msOwnerPicker=null, msOwnerSearchTimer=null;
+window.msOpenOwnerMenu = function(ev,projectId,phaseId,itemId) {
+ ev.stopPropagation();const p=msGetProject(projectId);if(!p||!canEdit(p))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);if(!item)return;
+ const user=getSystemUsersList().find(u=>String(u.id||u.email)===String(item.ownerId));
+ msOwnerPicker={projectId,phaseId,itemId,users:new Map(),offset:0,query:'',hasMore:false,request:0,selected:item.ownerId?{id:item.ownerId,name:item.ownerName||user?.name||user?.email||'Responsável cadastrado'}:null};
+ clearTimeout(msOwnerSearchTimer);
+ modal('Responsável pelo marco',`<form id="msOwnerForm" onsubmit="event.preventDefault();msSaveOwner()"><div class="field"><label for="msOwnerMode">Como deseja informar?</label><select id="msOwnerMode" onchange="msToggleOwnerMode()"><option value="user" ${item.ownerType!=='manual'?'selected':''}>Selecionar usuário cadastrado</option><option value="manual" ${item.ownerType==='manual'?'selected':''}>Digitar nome</option></select></div><div id="msOwnerRegistered"><div class="field"><label for="msOwnerSearch">Buscar usuário</label><input id="msOwnerSearch" type="search" maxlength="100" placeholder="Nome ou e-mail" oninput="msSearchOwners(this.value)"></div><p id="msOwnerSelection" aria-live="polite"></p><div id="msOwnerOptions" class="ms-owner-options"></div><button type="button" id="msOwnerMore" class="btn" hidden onclick="msLoadOwners(true)">Mostrar mais usuários</button></div><div id="msOwnerManual" class="field" hidden><label for="msOwnerName">Nome do responsável</label><input id="msOwnerName" maxlength="120" value="${esc(item.ownerName || '')}" placeholder="Digite o nome"></div><div class="actions"><button type="button" class="btn" onclick="msClearOwner()">Sem responsável</button><button type="submit" class="btn primary">Salvar responsável</button></div></form>`,btn('Cancelar','closeModal()','close'));
+ msRenderOwnerSelection();msToggleOwnerMode();
 };
-
-window.msSelectOwner = function (projectId, phaseId, itemId, ownerId) {
-  const p = msGetProject(projectId);
-  if (!p) return;
-  const phase = ensureProjectMilestones(p).find((x) => x.id === phaseId);
-  const item = phase?.items.find((x) => x.id === itemId);
-  if (item) {
-    item.ownerId = ownerId;
-    msCommit(p, 'Atribuiu responsável ao marco');
-  }
+window.msToggleOwnerMode=function(){const manual=document.getElementById('msOwnerMode')?.value==='manual';document.getElementById('msOwnerRegistered').hidden=manual;document.getElementById('msOwnerManual').hidden=!manual;if(!manual && msOwnerPicker && !msOwnerPicker.users.size)msLoadOwners();};
+function msRenderOwnerSelection(){const el=document.getElementById('msOwnerSelection');if(el)el.textContent=msOwnerPicker?.selected?'Selecionado: '+msOwnerPicker.selected.name:'Nenhum usuário selecionado.';}
+window.msSearchOwners=function(value){if(!msOwnerPicker)return;msOwnerPicker.query=value.trim();msOwnerPicker.request++;clearTimeout(msOwnerSearchTimer);const state=msOwnerPicker;msOwnerSearchTimer=setTimeout(()=>{if(msOwnerPicker===state)msLoadOwners();},220);};
+window.msLoadOwners=async function(more=false){
+ const state=msOwnerPicker,list=document.getElementById('msOwnerOptions');if(!state||!list)return;
+ const request=++state.request;if(!more){state.offset=0;state.users.clear();}list.textContent='Carregando usuários…';const moreButton=document.getElementById('msOwnerMore');moreButton.disabled=true;
+ try{if(!window.sb)throw new Error('Conexão ao servidor indisponível.');const result=await window.sb.rpc('secap_meeting_users',{p_search:state.query,p_offset:state.offset});
+ if(state!==msOwnerPicker || request!==state.request || !document.getElementById('msOwnerForm'))return;
+ if(result.error)throw result.error;if(!Array.isArray(result.data?.users))throw new Error('Lista de usuários inválida.');
+ for(const u of result.data.users)state.users.set(u.id,u);state.offset+=result.data.users.length;state.hasMore=!!result.data.hasMore;
+ list.innerHTML=[...state.users.values()].map((u,i)=>`<button type="button" class="ms-owner-option" onclick="msPickOwner(${i})"><strong>${esc(u.name||u.email)}</strong><small>${esc(u.email)}</small></button>`).join('')||'<p>Nenhum usuário encontrado.</p>';moreButton.hidden=!state.hasMore;moreButton.disabled=false;
+ }catch(error){if(state!==msOwnerPicker||request!==state.request)return;list.innerHTML='<p role="alert">Não foi possível carregar os usuários. Você pode digitar o nome ou tentar novamente.</p><button type="button" class="btn" onclick="msLoadOwners()">Tentar novamente</button>';moreButton.hidden=true;}
 };
+window.msPickOwner=function(index){const u=[...msOwnerPicker.users.values()][index];if(!u)return;msOwnerPicker.selected={id:u.id,name:u.name||u.email};msRenderOwnerSelection();};
+window.msSaveOwner=function(){
+ const state=msOwnerPicker;if(!state||!document.getElementById('msOwnerForm'))return;const p=msGetProject(state.projectId);if(!p||!canEdit(p))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===state.phaseId)?.items.find(it=>it.id===state.itemId);if(!item)return;
+ const manual=document.getElementById('msOwnerMode').value==='manual',name=manual?document.getElementById('msOwnerName').value.trim():state.selected?.name;
+ if(!name||name.length>120)return notify(manual?'Informe o nome do responsável.':'Selecione um usuário cadastrado.','error');
+ const before=item.ownerName||getSystemUsersList().find(u=>String(u.id||u.email)===String(item.ownerId))?.name||'—';
+ item.ownerId=manual?'':state.selected.id;item.ownerName=name;item.ownerType=manual?'manual':'user';
+ closeModal();persist('Alterou responsável do marco no BI',p,before,name,'Responsável do marco · '+item.title);render();
+};
+window.msClearOwner=function(){const state=msOwnerPicker;if(!state)return;const p=msGetProject(state.projectId);if(!p||!canEdit(p))return;const item=ensureProjectMilestones(p).find(ph=>ph.id===state.phaseId)?.items.find(it=>it.id===state.itemId);if(!item)return;const before=item.ownerName||'—';item.ownerId='';item.ownerName='';item.ownerType='';closeModal();persist('Removeu responsável do marco no BI',p,before,'—','Responsável do marco · '+item.title);render();};
+window.msSelectOwner=function(projectId,phaseId,itemId,ownerId){const p=msGetProject(projectId);if(!p||!canEdit(p))return;const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);const u=getSystemUsersList().find(u=>String(u.id||u.email)===String(ownerId));if(!item||(!u&&ownerId))return;item.ownerId=ownerId;item.ownerName=u?.name||u?.email||'';item.ownerType=ownerId?'user':'';msCommit(p,'Alterou responsável do marco no BI');};
 
 function biTerms(p, rs) {
   const terms = db.terms.filter((t) => t.project === p.id);
@@ -1080,6 +1066,7 @@ admin = function () {
 function adminSolicitacoes() {
   return `<section class=\"panel solicitacoes-panel\"><div class=\"panelhead\"><div><h2>Solicitações</h2><p class=\"subtitle\">Acompanhe e responda as solicitações no sistema de solicitações da SECAP. O link abre em uma nova aba.</p></div><button class=\"btn primary\" type=\"button\" onclick=\"openSolicitacoes()\">${icon('link')} Ir para solicitações</button></div></section>`;
 }
+
 function setAdminSection() {
   adminSection = 'access';
   render();
@@ -1181,3 +1168,676 @@ function biTemplateContext(p, rs) {
   return '';
 }
 render();
+
+/* ============================================================================
+   SECAP · CONTROLE GRANULAR DE PERMISSÕES POR CAMPO E OBRA (ADMINISTRAÇÃO)
+   ============================================================================ */
+
+if (!db.fieldPermissions) {
+  // Estrutura: { [userId]: { [projectId]: ['fieldId1', 'fieldId2', ...] } }
+  db.fieldPermissions = {};
+}
+
+let permSelectedUser = '',
+  permSelectedProject = '';
+
+// 1. Reestrutura a aba Administração com sub-abas no padrão visual do portal
+admin = function () {
+  if (!isSysAdmin())
+    return empty(
+      'Acesso do administrador',
+      'Esta área está disponível somente para o perfil administrador.'
+    );
+
+  if (!['access', 'field-perms'].includes(adminSection)) {
+    adminSection = 'access';
+  }
+
+  return (
+    backLink() +
+    `<section class="admin-institution">
+      <img src="logo-negative.png" alt="Prefeitura de Goiânia">
+      <div>
+        <div class="institution-label">PREFEITURA DE GOIÂNIA · SECAP<br>${esc(db.portalSettings.department.replace(/^Secretaria Municipal de /, ''))}</div>
+        <h1>Administração</h1>
+        <p>Gerencie o acesso ao sistema e defina quais campos cada usuário pode editar por projeto.</p>
+      </div>
+      <div class="admin-badge">${icon('shield')}Administrador</div>
+    </section>
+    <nav class="subtabs" aria-label="Sub-abas da administração">
+      <button class="${adminSection === 'access' ? 'active' : ''}" aria-current="${adminSection === 'access' ? 'page' : 'false'}" onclick="setAdminSection('access')">
+        ${icon('user')}Acesso ao sistema
+      </button>
+      <button class="${adminSection === 'field-perms' ? 'active' : ''}" aria-current="${adminSection === 'field-perms' ? 'page' : 'false'}" onclick="setAdminSection('field-perms')">
+        ${icon('edit')}Permissões por campo
+      </button>
+    </nav>` +
+    (adminSection === 'field-perms' ? adminFieldPermissions() : adminSolicitacoes() + adminAccess())
+  );
+};
+
+let cachedServerUsers = null;
+
+let fieldPermUsersCache = null;
+
+setAdminSection = function (section = 'access') {
+  adminSection = section;
+  render();
+  if (section === 'access' && typeof loadAccountRequests === 'function') {
+    loadAccountRequests();
+  }
+  if (section === 'field-perms') {
+    ensureFieldPermUsersLoaded();
+  }
+};
+
+async function ensureFieldPermUsersLoaded() {
+  try {
+    const response = await fetch('/api/account-requests', {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.ok && Array.isArray(result.requests)) {
+      fieldPermUsersCache = result.requests;
+      render();
+    }
+  } catch (error) {
+    console.error('Erro ao consultar usuários aprovados:', error);
+  }
+}
+
+function getApprovedPortalUsers() {
+  const reqs = Array.isArray(fieldPermUsersCache)
+    ? fieldPermUsersCache
+    : typeof accountRequestsCache !== 'undefined' && Array.isArray(accountRequestsCache)
+      ? accountRequestsCache
+      : [];
+
+  // A RPC do Supabase retorna status 'aprovada' e profile_role='usuario'.
+  // O ID disponível aqui é o da solicitação, não o UUID de auth.users;
+  // por isso o e-mail é a chave estável usada também na verificação da edição.
+  return reqs.filter((r) => {
+    const status = String(r.status || '')
+      .trim()
+      .toLowerCase();
+    const role = String(r.profile_role || r.role || '')
+      .trim()
+      .toLowerCase();
+    const email = String(r.email || '')
+      .trim()
+      .toLowerCase();
+
+    const isApproved = ['aprovada', 'aprovado', 'approved', 'active', 'ativo'].includes(status);
+    const isUser = !role || ['usuario', 'usuário', 'user'].includes(role);
+    const isAdmin =
+      ['administrador', 'admin'].includes(role) ||
+      email === 'secap@gmail.com' ||
+      Boolean(r.isAdmin);
+
+    return isApproved && isUser && !isAdmin && Boolean(email);
+  });
+}
+
+async function loadFieldPermUsers() {
+  try {
+    // Usa exatamente o mesmo endpoint da loadAccountRequests()
+    const res = await fetch('/api/account-requests');
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : data.requests || data.items || [];
+
+    // Filtra apenas os usuários que tiveram o acesso aprovado
+    const approved = list.filter((r) =>
+      ['approved', 'aprovado'].includes(String(r.status || '').toLowerCase())
+    );
+
+    // Ignora administradores, pois já possuem acesso irrestrito
+    cachedServerUsers = approved.filter(
+      (u) => u.role !== 'Administrador' && u.role !== 'admin' && !u.isAdmin
+    );
+
+    render();
+  } catch (err) {
+    console.error('Erro ao carregar usuários aprovados:', err);
+  }
+}
+
+// 2. Renderização da Sub-aba "Permissões por campo"
+function adminFieldPermissions() {
+  const users = getApprovedPortalUsers();
+  const projects = Array.isArray(db.projects) ? db.projects : [];
+
+  if (
+    permSelectedUser &&
+    !users.some(
+      (u) =>
+        String(u.email || '')
+          .trim()
+          .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+    )
+  ) {
+    permSelectedUser = '';
+  }
+  if (permSelectedProject && !projects.some((p) => String(p.id) === String(permSelectedProject))) {
+    permSelectedProject = '';
+  }
+
+  const selectedProjObj = projects.find((p) => String(p.id) === String(permSelectedProject));
+  const userMap = db.fieldPermissions?.[permSelectedUser] || {};
+  // Uma regra só existe quando o administrador salvou explicitamente a lista de campos permitidos.
+  const hasExplicitRule =
+    permSelectedUser && permSelectedProject && Array.isArray(userMap[permSelectedProject]);
+
+  // Segurança por padrão: sem regra explícita, nenhum campo pode ser editado.
+  const allowedFields = hasExplicitRule ? userMap[permSelectedProject] : [];
+  const selectedUserItem = permSelectedUser
+    ? users.find(
+        (u) =>
+          String(u.email || '')
+            .trim()
+            .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+      )
+    : null;
+  const accessNotice = fieldPermAccessNotice(selectedUserItem, selectedProjObj);
+
+  return `
+    <section class="panel">
+      <div class="panelhead">
+        <div>
+          <h2>Permissões de edição por obra e campo</h2>
+          <p class="subtitle">Selecione um usuário e um projeto para restringir exatamente quais colunas/campos ele poderá alterar.</p>
+        </div>
+        ${
+          permSelectedUser && permSelectedProject
+            ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn" onclick="toggleAllPermFields(true)" title="Permitir edição de todos os campos">${icon('check')}Marcar todos</button>
+                <button type="button" class="btn" onclick="toggleAllPermFields(false)" title="Bloquear edição de todos os campos">${icon('close')}Desmarcar todos</button>
+              </div>`
+            : ''
+        }
+      </div>
+      <div class="panelbody">
+        <div class="twocol" style="margin-bottom:20px">
+          <div class="field">
+            <label for="permUserSelect">1. Usuário</label>
+            <select id="permUserSelect" onchange="permSelectedUser=this.value;render()">
+              <option value="">Selecione um usuário...</option>
+              ${users
+                .map((u) => {
+                  // O endpoint admin_list_account_requests não expõe auth.uid();
+                  // usar o e-mail evita salvar regras sob o ID numérico da solicitação.
+                  const uid = String(u.email || u.user_id || u.id)
+                    .trim()
+                    .toLowerCase();
+                  const displayName = u.name || u.full_name || u.nome || u.email;
+                  const label = `${displayName}${u.email && displayName !== u.email ? ' (' + u.email + ')' : ''}`;
+                  return `<option value="${esc(uid)}" ${String(permSelectedUser) === uid ? 'selected' : ''}>${esc(label)}</option>`;
+                })
+                .join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="permProjectSelect">2. Projeto / Pasta de Obras</label>
+            <select id="permProjectSelect" ${!permSelectedUser ? 'disabled' : ''} onchange="permSelectedProject=this.value;render()">
+              <option value="">Selecione um projeto...</option>
+              ${projects
+                .map(
+                  (p) =>
+                    `<option value="${esc(p.id)}" ${String(permSelectedProject) === String(p.id) ? 'selected' : ''}>${esc(p.name)} (${(p.records || []).length} registros)</option>`
+                )
+                .join('')}
+            </select>
+          </div>
+        </div>
+
+        ${
+          !permSelectedUser || !permSelectedProject
+            ? empty(
+                'Selecione usuário e projeto',
+                'Escolha um usuário e a pasta de obras acima para configurar os campos permitidos.'
+              )
+            : !selectedProjObj?.fields?.length
+              ? empty(
+                  'Projeto sem campos cadastrados',
+                  'Este projeto ainda não possui campos configurados.'
+                )
+              : `
+                ${accessNotice}
+                <div class="summary-strip" style="margin-bottom:18px">
+                  ${icon('shield')}
+                  <p>
+                    <strong>${hasExplicitRule ? 'Regra personalizada ativa.' : 'Padrão restrito (nenhum campo liberado).'}</strong>
+                    Marque abaixo apenas os campos que este usuário pode editar em <strong>${esc(selectedProjObj.name)}</strong>.
+                  </p>
+                </div>
+                <form id="fieldPermsForm" onsubmit="event.preventDefault();saveFieldPermissions()">
+                  <div class="template-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+                    ${selectedProjObj.fields
+                      .map((f) => {
+                        const checked = allowedFields.includes(f.id);
+                        return `
+                          <label class="template-option" style="align-items:center">
+                            <input type="checkbox" name="perm_field" value="${esc(f.id)}" ${checked ? 'checked' : ''}>
+                            <span>
+                              <b>${esc(f.name)}</b>
+                              <small>ID: ${esc(f.id)} · Tipo: ${esc(f.type)}</small>
+                            </span>
+                          </label>
+                        `;
+                      })
+                      .join('')}
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:22px;padding-top:16px;border-top:1px solid var(--line,#e2e8f0)">
+                    ${
+                      hasExplicitRule
+                        ? `<button type="button" class="btn" onclick="resetFieldPermissions()">Restaurar padrão (bloquear todos)</button>`
+                        : ''
+                    }
+                    <button type="submit" class="btn primary">${icon('check')}Salvar permissões de campos</button>
+                  </div>
+                </form>
+                ${rowFilterPanel(selectedProjObj)}
+              `
+        }
+      </div>
+    </section>
+  `;
+}
+
+// Avisos de contexto: as permissões por campo só têm efeito se o usuário também tiver
+// "Visualizar e editar" e acesso ao projeto (ambos definidos em Acesso ao sistema).
+function fieldPermAccessNotice(item, project) {
+  if (!item || !project) return '';
+  const notes = [];
+  if (item.obras_access !== 'editar') {
+    notes.push(
+      `<strong>${esc(item.name || item.email)} está como “Somente visualizar”.</strong> Os campos marcados abaixo só valem quando o acesso às obras for “Visualizar e editar”.` +
+        ` <button type="button" class="btn small" onclick="grantEditFromFieldPerms(${Number(item.id)})">Liberar edição</button>`
+    );
+  }
+  if (
+    item.project_scope === 'selected' &&
+    !(item.project_ids || []).map(String).includes(String(project.id))
+  ) {
+    notes.push(
+      `<strong>Este usuário não tem acesso ao projeto ${esc(project.name)}.</strong> Inclua o projeto em “Projetos permitidos”, na sub-aba Acesso ao sistema, para que as permissões abaixo tenham efeito.`
+    );
+  }
+  return notes
+    .map(
+      (html) =>
+        `<div class="summary-strip" style="margin-bottom:12px;border-color:#f59e0b;background:#fffbeb">${icon('shield')}<p>${html}</p></div>`
+    )
+    .join('');
+}
+
+async function grantEditFromFieldPerms(requestId) {
+  if (!isSysAdmin()) return;
+  const id = Number(requestId);
+  if (!Number.isSafeInteger(id) || id < 1) return;
+  try {
+    const response = await fetch('/api/account-requests/obras-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, access: 'editar' }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'Não foi possível alterar a permissão.');
+    // As duas listas (desta sub-aba e de Acesso ao sistema) guardam cópias separadas.
+    [fieldPermUsersCache, typeof accountRequestsCache !== 'undefined' ? accountRequestsCache : null]
+      .filter(Array.isArray)
+      .forEach((list) => {
+        const found = list.find((r) => Number(r.id) === id);
+        if (found) found.obras_access = 'editar';
+      });
+    render();
+    notify('Acesso às obras alterado para “Visualizar e editar”.', 'success');
+  } catch (error) {
+    notify(`Erro ao alterar a permissão: ${error.message}`, 'error');
+  }
+}
+
+function toggleAllPermFields(checked) {
+  const form = document.getElementById('fieldPermsForm');
+  if (!form) return;
+
+  form.querySelectorAll('input[name="perm_field"]').forEach((field) => {
+    field.checked = Boolean(checked);
+  });
+}
+
+function saveFieldPermissions() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  const checked = Array.from(
+    document.querySelectorAll('#fieldPermsForm input[name="perm_field"]:checked')
+  ).map((el) => el.value);
+
+  if (!db.fieldPermissions[permSelectedUser]) {
+    db.fieldPermissions[permSelectedUser] = {};
+  }
+  db.fieldPermissions[permSelectedUser][permSelectedProject] = checked;
+
+  const u = getApprovedPortalUsers().find(
+    (x) =>
+      String(x.email || '')
+        .trim()
+        .toLowerCase() === String(permSelectedUser).trim().toLowerCase()
+  );
+  const p = db.projects.find((x) => String(x.id) === String(permSelectedProject));
+
+  persist(
+    'Configurou permissões de campos',
+    `${u?.name || u?.email || permSelectedUser} · ${p?.name || permSelectedProject}`,
+    '',
+    `${checked.length} campo(s) liberado(s)`
+  );
+  render();
+  notify('Permissões de campos salvas com sucesso.');
+}
+
+function resetFieldPermissions() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  if (db.fieldPermissions?.[permSelectedUser]) {
+    delete db.fieldPermissions[permSelectedUser][permSelectedProject];
+  }
+  persist('Restaurou padrão de permissões', permSelectedProject, '', 'Todos os campos bloqueados');
+  render();
+  notify('Padrão restaurado: nenhum campo liberado para este usuário.');
+}
+
+/* ---------------------------------------------------------------------------
+   Filtro de obras por usuário (opcional)
+   Estrutura: db.rowFilters[email][projectId] = { field, values: [...] }
+   Aplicado no banco (RLS em public.obras, função secap_private.obra_allowed):
+   o usuário só lê, edita ou exclui obras cujo campo tenha um dos valores.
+   --------------------------------------------------------------------------- */
+if (!db.rowFilters || typeof db.rowFilters !== 'object') db.rowFilters = {};
+
+// Tipos com valores discretos; números/moeda/texto longo não servem como filtro.
+const ROW_FILTER_TYPES = ['text', 'select', 'boolean', 'date'];
+let rowFilterDraft = null; // { key, field, values: Set<string> }
+
+const rowFilterNorm = (v) =>
+  String(v ?? '')
+    .trim()
+    .toLowerCase();
+
+function savedRowFilter(user = permSelectedUser, projectId = permSelectedProject) {
+  const rule = db.rowFilters?.[user]?.[projectId];
+  return rule && rule.field && Array.isArray(rule.values) && rule.values.length ? rule : null;
+}
+
+function currentRowFilterDraft() {
+  const key = `${permSelectedUser}|${permSelectedProject}`;
+  if (!rowFilterDraft || rowFilterDraft.key !== key) {
+    const saved = savedRowFilter();
+    rowFilterDraft = {
+      key,
+      field: saved?.field || '',
+      values: new Set((saved?.values || []).map(String)),
+    };
+  }
+  return rowFilterDraft;
+}
+
+// Valores disponíveis: opções do campo + valores realmente presentes nas obras.
+function rowFilterValueCounts(project, fieldId) {
+  const field = (project.fields || []).find((f) => String(f.id) === String(fieldId));
+  const counts = new Map(); // norm -> { label, count }
+  const add = (raw, inc) => {
+    const label = String(raw ?? '').trim();
+    if (!label) return;
+    const k = rowFilterNorm(label);
+    const item = counts.get(k) || { label, count: 0 };
+    item.count += inc;
+    counts.set(k, item);
+  };
+  (Array.isArray(field?.options) ? field.options : []).forEach((o) =>
+    add(typeof o === 'object' ? (o.value ?? o.label) : o, 0)
+  );
+  (project.records || []).forEach((r) => add(r[fieldId], 1));
+  return [...counts.values()].sort(
+    (a, b) => b.count - a.count || a.label.localeCompare(b.label, 'pt-BR')
+  );
+}
+
+function rowFilterMatches(project, draft) {
+  const wanted = new Set([...draft.values].map(rowFilterNorm));
+  return (project.records || []).filter((r) => wanted.has(rowFilterNorm(r[draft.field]))).length;
+}
+
+function rowFilterPanel(project) {
+  if (!project) return '';
+  const draft = currentRowFilterDraft();
+  const saved = savedRowFilter();
+  const total = (project.records || []).length;
+  const fields = (project.fields || []).filter((f) => ROW_FILTER_TYPES.includes(f.type));
+  const values = draft.field ? rowFilterValueCounts(project, draft.field) : [];
+  const savedField = saved && (project.fields || []).find((f) => f.id === saved.field);
+
+  return `
+    <section class="row-filter" style="margin-top:28px;padding-top:22px;border-top:1px solid var(--line,#e2e8f0)">
+      <h3 style="margin:0 0 4px">Filtro de obras (opcional)</h3>
+      <p class="subtitle" style="margin:0 0 14px">Limite quais obras deste projeto o usuário enxerga. Sem filtro, ele vê todas as obras do projeto. O filtro vale para visualização, edição e exclusão e é aplicado pelo servidor.</p>
+      <div class="summary-strip" style="margin-bottom:16px">
+        ${icon('shield')}
+        <p>${
+          saved
+            ? `<strong>Filtro ativo:</strong> ${esc(savedField?.name || saved.field)} = ${saved.values.map((v) => `<b>${esc(v)}</b>`).join(', ')}.`
+            : '<strong>Sem filtro.</strong> O usuário vê todas as obras deste projeto.'
+        }</p>
+      </div>
+      <div class="field" style="max-width:420px">
+        <label for="rowFilterField">Campo da obra usado no filtro</label>
+        <select id="rowFilterField" onchange="setRowFilterField(this.value)">
+          <option value="">Sem filtro (todas as obras)</option>
+          ${fields
+            .map(
+              (f) =>
+                `<option value="${esc(f.id)}" ${draft.field === f.id ? 'selected' : ''}>${esc(f.name)}</option>`
+            )
+            .join('')}
+        </select>
+      </div>
+      ${
+        draft.field
+          ? `
+        <div style="margin-top:14px">
+          <div class="field" style="max-width:420px;margin-bottom:10px">
+            <label for="rowFilterSearch">Valores permitidos <small>(marque um ou mais)</small></label>
+            ${
+              values.length > 12
+                ? `<input id="rowFilterSearch" type="search" placeholder="Buscar valor…" oninput="filterRowFilterValues(this.value)">`
+                : ''
+            }
+          </div>
+          <div id="rowFilterValues" class="template-grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));max-height:340px;overflow:auto">
+            ${
+              values.length
+                ? values
+                    .map(
+                      (v) => `
+              <label class="template-option" style="align-items:center" data-label="${esc(rowFilterNorm(v.label))}">
+                <input type="checkbox" value="${esc(v.label)}" ${draft.values.has(v.label) ? 'checked' : ''} onchange="toggleRowFilterValue(this.value,this.checked)">
+                <span><b>${esc(v.label)}</b><small>${v.count} obra(s)</small></span>
+              </label>`
+                    )
+                    .join('')
+                : '<p class="subtitle">Nenhuma obra deste projeto tem esse campo preenchido.</p>'
+            }
+          </div>
+        </div>`
+          : ''
+      }
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px">
+        <span id="rowFilterPreview" class="subtitle">${rowFilterPreviewText(project, draft, total)}</span>
+        <div style="display:flex;gap:10px">
+          ${saved ? `<button type="button" class="btn" onclick="removeRowFilter()">${icon('close')}Remover filtro</button>` : ''}
+          <button type="button" class="btn primary" onclick="saveRowFilter()">${icon('check')}Salvar filtro</button>
+        </div>
+      </div>
+    </section>`;
+}
+
+function rowFilterPreviewText(project, draft, total) {
+  if (!draft.field) return `O usuário verá as ${total} obras do projeto.`;
+  if (!draft.values.size) return 'Marque ao menos um valor (ou escolha “Sem filtro”).';
+  return `O usuário verá ${rowFilterMatches(project, draft)} de ${total} obras.`;
+}
+
+function setRowFilterField(fieldId) {
+  const draft = currentRowFilterDraft();
+  draft.field = fieldId;
+  draft.values = new Set();
+  render();
+}
+
+function toggleRowFilterValue(value, checked) {
+  const draft = currentRowFilterDraft();
+  if (checked) draft.values.add(value);
+  else draft.values.delete(value);
+  const project = (db.projects || []).find((p) => String(p.id) === String(permSelectedProject));
+  const el = document.getElementById('rowFilterPreview');
+  if (project && el)
+    el.textContent = rowFilterPreviewText(project, draft, (project.records || []).length);
+}
+
+function filterRowFilterValues(text) {
+  const q = rowFilterNorm(text);
+  document.querySelectorAll('#rowFilterValues [data-label]').forEach((el) => {
+    el.style.display = !q || el.dataset.label.includes(q) ? '' : 'none';
+  });
+}
+
+function saveRowFilter() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  const draft = currentRowFilterDraft();
+  if (!draft.field) return removeRowFilter();
+  if (!draft.values.size) {
+    notify('Marque ao menos um valor ou escolha “Sem filtro”.', 'error');
+    return;
+  }
+  const project = db.projects.find((x) => String(x.id) === String(permSelectedProject));
+  const field = (project?.fields || []).find((f) => f.id === draft.field);
+  const values = [...draft.values];
+  if (!db.rowFilters[permSelectedUser]) db.rowFilters[permSelectedUser] = {};
+  db.rowFilters[permSelectedUser][permSelectedProject] = { field: draft.field, values };
+  persist(
+    'Configurou filtro de obras',
+    `${permSelectedUser} · ${project?.name || permSelectedProject}`,
+    '',
+    `${field?.name || draft.field} = ${values.join(', ')}`
+  );
+  render();
+  notify('Filtro de obras salvo.');
+}
+
+function removeRowFilter() {
+  if (!isSysAdmin() || !permSelectedUser || !permSelectedProject) return;
+  const had = Boolean(savedRowFilter());
+  if (db.rowFilters?.[permSelectedUser]) {
+    delete db.rowFilters[permSelectedUser][permSelectedProject];
+    if (!Object.keys(db.rowFilters[permSelectedUser]).length) delete db.rowFilters[permSelectedUser];
+  }
+  rowFilterDraft = null;
+  if (had)
+    persist(
+      'Removeu filtro de obras',
+      `${permSelectedUser} · ${permSelectedProject}`,
+      '',
+      'Todas as obras do projeto'
+    );
+  render();
+  notify(had ? 'Filtro removido: o usuário vê todas as obras do projeto.' : 'Nenhum filtro aplicado.');
+}
+
+// 3. Helper de verificação e bloqueio automático no Modal de Edição de Obra
+function getAllowedFieldsForCurrentUser(projectId) {
+  if (isSysAdmin()) return null; // null = acesso total do administrador
+  const user = me() || window.SECAP_MEMBER;
+  if (!user) return [];
+
+  const pid = String(projectId);
+  const email = String(user.email || window.SECAP_EMAIL || '')
+    .trim()
+    .toLowerCase();
+  const id = String(user.id || '').trim();
+  const permissions = db.fieldPermissions || {};
+  const byEmail = email ? permissions[email]?.[pid] : null;
+  const byId = id ? permissions[id]?.[pid] : null;
+  const rules = Array.isArray(byEmail) ? byEmail : Array.isArray(byId) ? byId : null;
+
+  // Ausência de regra não significa liberação: acesso negado por padrão.
+  return rules ? rules.map(String) : [];
+}
+
+// Aplica as permissões também ao formulário de criação/edição, que é aberto
+// diretamente por vários pontos da interface (não apenas por editRecord).
+if (typeof openRecordForm === 'function') {
+  const openRecordFormOriginal = openRecordForm;
+  openRecordForm = function (projId, recId = '') {
+    const result = openRecordFormOriginal(projId, recId);
+    const allowed = getAllowedFieldsForCurrentUser(projId);
+    if (allowed === null) return result;
+
+    const project = (db.projects || []).find((item) => String(item.id) === String(projId));
+    const form = document.getElementById('recordForm');
+    if (!project || !form) return result;
+
+    project.fields.forEach((field) => {
+      if (allowed.includes(String(field.id))) return;
+      const input = form.querySelector(`[name="${CSS.escape(String(field.id))}"]`);
+      if (!input) return;
+      input.disabled = true;
+      input.title = 'Você não tem permissão para editar este campo neste projeto.';
+      input.setAttribute('aria-disabled', 'true');
+      input.style.opacity = '0.6';
+      input.style.cursor = 'not-allowed';
+    });
+
+    if (!allowed.length) {
+      const saveButton = document.querySelector('#modal button[type="submit"][form="recordForm"]');
+      if (saveButton) saveButton.disabled = true;
+      const notice = document.createElement('p');
+      notice.className = 'subtitle';
+      notice.style.cssText = 'color:#b45309;margin:12px 0 0';
+      notice.textContent =
+        'Você não possui permissão para editar campos deste projeto. Solicite a liberação ao administrador.';
+      form.appendChild(notice);
+    }
+    return result;
+  };
+}
+
+if (typeof editRecord === 'function') {
+  const editRecordOriginal = editRecord;
+  editRecord = function (projId, recId) {
+    editRecordOriginal(projId, recId);
+
+    const allowed = getAllowedFieldsForCurrentUser(projId);
+    if (allowed === null) return; // Sem restrição customizada
+
+    const p = db.projects.find((x) => String(x.id) === String(projId));
+    if (!p) return;
+
+    const modalEl = $('#modal');
+    if (!modalEl) return;
+
+    // Bloqueia todos os inputs/selects/textareas referentes aos campos não autorizados
+    p.fields.forEach((f) => {
+      if (!allowed.includes(f.id)) {
+        const inputs = modalEl.querySelectorAll(
+          `[name="${f.id}"], [name="field_${f.id}"], [data-field="${f.id}"], #field_${f.id}`
+        );
+        inputs.forEach((inp) => {
+          inp.disabled = true;
+          inp.title = 'Você não tem permissão para editar este campo neste projeto.';
+          inp.style.opacity = '0.65';
+          inp.style.cursor = 'not-allowed';
+        });
+      }
+    });
+  };
+}

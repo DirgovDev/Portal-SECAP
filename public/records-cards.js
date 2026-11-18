@@ -63,6 +63,8 @@
     const status=canonicalStatus(val(r,p,'status')||r.status),title=recordTitle(r,p);
     const fields=[['ID',cardValue(r,p,'codigo','id')],['Órgão responsável',cardValue(r,p,'orgao','orgao responsavel','agency')],['Macroetapa',cardValue(r,p,'etapa','macroetapa','stage')],['Prioridade',cardValue(r,p,'prioridade','prioridade','priority')]];
     const open="editRecord('"+esc(p.id)+"','"+esc(r.id)+"')";
-    return '<article class="rcard municipal-work-card" tabindex="0" role="button" aria-label="Abrir '+esc(title)+'" onclick="'+open+'" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();'+open+'}">'+'<div class="work-card-status">'+badge(status)+'</div><div class="work-card-heading"><h3>'+esc(title)+'</h3></div><div class="rc-grid">'+fields.map(([label,value])=>'<div class="rc-item"><span>'+label+'</span><b>'+esc(value)+'</b></div>').join('')+'</div><footer class="rc-foot"><span>Abrir obra</span>'+icon('arrow')+'</footer></article>';
+    // A cor do topo do card acompanha a cor do status da obra.
+    const chip=badge(status),tint=(/--status-color:([^;"]+)/.exec(chip)||[])[1]||'#0a7cc1';
+    return '<article class="rcard municipal-work-card" style="--wc:'+esc(tint)+'" tabindex="0" role="button" aria-label="Abrir '+esc(title)+'" onclick="'+open+'" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();'+open+'}">'+'<div class="work-card-heading"><h3>'+esc(title)+'</h3></div><div class="rc-grid">'+fields.map(([label,value])=>'<div class="rc-item"><span>'+label+'</span><b>'+esc(value)+'</b></div>').join('')+'</div><footer class="rc-foot"><span class="work-card-status">'+chip+'</span><span class="rc-open">Abrir obra'+icon('arrow')+'</span></footer></article>';
   }
 })();

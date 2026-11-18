@@ -388,24 +388,24 @@
   }
 }
 /* ==========================================================================
-   DESTAQUE DOS GRUPOS E SEÇÕES (LINHA LARANJA SECAP)
+   DESTAQUE DOS GRUPOS E SEÇÕES (CORES DISTINTAS POR SEÇÃO)
    ========================================================================== */
 
-/* Cabeçalho da Seção com Linha Laranja */
+/* Cabeçalho da Seção com linha na cor específica da seção */
 .section-group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 32px 0 16px 0;
   padding-bottom: 8px;
-  border-bottom: 3px solid #f37021 !important; /* Linha Laranja Oficial SECAP */
+  border-bottom: none !important;
   position: relative;
 }
 
 .section-group-header h2 {
   font-size: 16px;
   font-weight: 700;
-  color: #003856; /* Azul Escuro Institucional */
+  color: #003856;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin: 0;
@@ -414,23 +414,28 @@
   gap: 10px;
 }
 
-/* Tamanho e cor dos ícones nos títulos das seções */
+/* Cor dos ícones acompanhando a cor da seção */
 .section-group-header h2 svg,
 .section-group-header h2 i {
   width: 18px;
   height: 18px;
-  color: #f37021; /* Cor Laranja SECAP nos ícones */
+  color: var(--sec-color, #f37021) !important;
 }
 
-/* Badge indicando a quantidade de campos da seção */
+/* Badge indicando a quantidade de campos na cor da seção */
 .section-group-header .count-badge {
-  background-color: #fff3eb;
-  color: #f37021;
+  background-color: var(--sec-bg, #fff3eb) !important;
+  color: var(--sec-color, #f37021) !important;
   font-size: 12px;
   font-weight: 600;
   padding: 2px 10px;
   border-radius: 12px;
-  border: 1px solid #fde3d3;
+  border: 1px solid var(--sec-border, #fde3d3) !important;
+}
+
+/* Destaque sutil na borda superior dos cartões de dados da seção */
+.detail-grid .detail-card {
+  border-top: 3px solid var(--sec-color, #f37021);
 }
 
 /* Destaque para as Sanfonas/Grupos na Modal de Edição */
@@ -456,9 +461,8 @@ details.record-group summary {
   transition: all 0.2s ease;
 }
 
-/* Borda Laranja quando o grupo estiver expandido */
 details.record-group[open] summary {
-  border-bottom-color: #f37021;
+  border-bottom-color: var(--sec-color, #f37021);
   background-color: #ffffff;
 }
 
@@ -468,21 +472,22 @@ details.record-group summary span {
   gap: 8px;
   color: #003856;
 }
-/* Layout da seção de grupos de edição (estilo da imagem de referência) */
+
+/* Layout da seção de grupos de edição */
 .edit-section-group {
   margin-bottom: 32px;
 }
 
-/* Títulos das seções (LOCALIZAÇÃO, PRAZOS E MARCOS, etc.) com a linha laranja SECAP */
+/* Títulos das seções na modal de edição */
 .edit-section-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #003856;
+  color: var(--sec-color, #003856);
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  margin: 0 0 16px 0;
+  margin: 24px 0 12px 0;
   padding-bottom: 6px;
-  border-bottom: 3px solid #f37021; /* Linha Laranja SECAP */
+  border-bottom: 3px solid var(--sec-color, #f37021);
   display: inline-block;
 }
 
@@ -505,17 +510,19 @@ details.record-group summary span {
   }
 }
 
-/* Estilo individual do cartão de input */
+/* Borda completa em volta de cada card de edição usando a cor da seção */
 .edit-cards-grid .field {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1.5px solid var(--sec-color, #e2e8f0); /* Aplica a cor temática em toda a volta do card */
   border-radius: 8px;
   padding: 14px 16px;
   margin: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  min-height: 100px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 /* Rótulo do campo (em caixa alta e cinza) */
@@ -588,7 +595,6 @@ details.record-group summary span {
   justify-content: space-between;
 }
 
-/* Título de seção com a linha Laranja SECAP */
 .edit-section-title {
   font-size: 14px;
   font-weight: 700;
@@ -597,7 +603,7 @@ details.record-group summary span {
   letter-spacing: 0.6px;
   margin: 24px 0 12px 0;
   padding-bottom: 6px;
-  border-bottom: 3px solid #f37021;
+  border-bottom: none !important; /* Remove completamente a linha abaixo do título */
   display: inline-block;
 }
 
@@ -615,14 +621,41 @@ details.record-group summary span {
   background: #fff;
   color: #233f4d;
   cursor: pointer;
-  transition: border-color .18s ease, box-shadow .18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.sidebar-profile:hover { border-color: #f37021; box-shadow: 0 2px 9px #17374612; }
-.sidebar-profile-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
-.sidebar-profile-copy b { overflow: hidden; color: #244452; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-profile-copy small { color: #82939b; font-size: 10px; }
-.sidebar-profile-edit { display: flex; color: #8a9aa1; }
-.sidebar-profile-edit svg { width: 14px; height: 14px; }
+.sidebar-profile:hover {
+  border-color: #f37021;
+  box-shadow: 0 2px 9px #17374612;
+}
+.sidebar-profile-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+.sidebar-profile-copy b {
+  overflow: hidden;
+  color: #244452;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-profile-copy small {
+  color: #82939b;
+  font-size: 10px;
+}
+.sidebar-profile-edit {
+  display: flex;
+  color: #8a9aa1;
+}
+.sidebar-profile-edit svg {
+  width: 14px;
+  height: 14px;
+}
 .profile-avatar {
   width: 40px;
   height: 40px;
@@ -639,26 +672,116 @@ details.record-group summary span {
   font-weight: 700;
   object-fit: cover;
 }
-.sidebar-avatar { display: block; }
-.avatar-modal-help { margin: 0 0 14px; color: #667b85; font-size: 13px; }
-.avatar-options { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
-.avatar-choice { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 6px; padding: 9px 4px; border: 1px solid #e5eaed; border-radius: 9px; background: #fff; color: #526b76; cursor: pointer; font-size: 10px; }
-.avatar-choice:hover, .avatar-choice:focus-visible { border-color: #f37021; outline: none; }
-.avatar-choice img { width: 54px; height: 54px; border: 2px solid #f37021; border-radius: 50%; background: #fff4ec; }
-.avatar-custom-form { display: flex; align-items: end; gap: 10px; margin-top: 20px; }
-.avatar-custom-form .field { flex: 1; margin: 0; }
-.avatar-custom-form .btn { white-space: nowrap; }
+.sidebar-avatar {
+  display: block;
+}
+.avatar-modal-help {
+  margin: 0 0 14px;
+  color: #667b85;
+  font-size: 13px;
+}
+.avatar-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.avatar-choice {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 4px;
+  border: 1px solid #e5eaed;
+  border-radius: 9px;
+  background: #fff;
+  color: #526b76;
+  cursor: pointer;
+  font-size: 10px;
+}
+.avatar-choice:hover,
+.avatar-choice:focus-visible {
+  border-color: #f37021;
+  outline: none;
+}
+.avatar-choice img {
+  width: 54px;
+  height: 54px;
+  border: 2px solid #f37021;
+  border-radius: 50%;
+  background: #fff4ec;
+}
+.avatar-custom-form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.avatar-custom-form .field {
+  flex: 1;
+  margin: 0;
+}
+.avatar-custom-form .btn {
+  white-space: nowrap;
+}
 @media (max-width: 620px) {
-  .avatar-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .avatar-custom-form { align-items: stretch; flex-direction: column; }
+  .avatar-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .avatar-custom-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 /* Construtor de avatar personalizado */
-.avatar-builder { margin-top: 18px; padding: 14px; border: 1px solid #e5eaed; border-radius: 12px; background: #fbfcfd; }
-.avatar-builder h3 { margin: 0 0 12px; color: #244452; font-size: 14px; }
-.avatar-builder-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.avatar-builder-controls .field { margin: 0; }
-.avatar-builder-controls select, .avatar-builder-controls input { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #dce4e8; border-radius: 7px; background: #fff; color: #244452; }
-.avatar-builder-preview { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: #667b85; font-size: 12px; }
-.avatar-builder-preview img { width: 88px; height: 88px; border: 2px solid #f37021; border-radius: 50%; background: #fff4ec; }
-@media (max-width: 620px) { .avatar-builder-controls { grid-template-columns: 1fr; } }
+.avatar-builder {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #e5eaed;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+.avatar-builder h3 {
+  margin: 0 0 12px;
+  color: #244452;
+  font-size: 14px;
+}
+.avatar-builder-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.avatar-builder-controls .field {
+  margin: 0;
+}
+.avatar-builder-controls select,
+.avatar-builder-controls input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #dce4e8;
+  border-radius: 7px;
+  background: #fff;
+  color: #244452;
+}
+.avatar-builder-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  color: #667b85;
+  font-size: 12px;
+}
+.avatar-builder-preview img {
+  width: 88px;
+  height: 88px;
+  border: 2px solid #f37021;
+  border-radius: 50%;
+  background: #fff4ec;
+}
+@media (max-width: 620px) {
+  .avatar-builder-controls {
+    grid-template-columns: 1fr;
+  }
+}

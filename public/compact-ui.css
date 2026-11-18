@@ -9,3 +9,103 @@ body{font-size:14px}.main>header{height:64px!important;min-height:64px!important
 @media(max-width:700px){.main .content{padding:18px!important}.login{grid-template-columns:1fr}.loginart{display:flex!important;min-height:270px!important;padding:125px 24px 32px!important}.loginart .loginart-logo{width:100px!important;left:24px!important;top:20px!important}.loginart h1{font-size:23px!important;margin-bottom:12px!important}.loginart p{font-size:12px!important;margin-bottom:0}.loginart:after{width:200px!important;height:200px!important;left:auto!important;right:-110px!important;bottom:-110px!important}.loginform{max-width:460px!important;padding:32px 24px!important}.login:after{display:none}.content .compact-calendar .day.agenda-day{min-height:105px!important;padding:6px!important}.content .day-statuses span{font-size:10px!important}}
 .loginart:after{display:block!important}.login,.loginart{min-height:calc(100dvh - var(--preview-offset,0px))!important}
 .content .dkpi .dkpi-num{font-size:26px!important;line-height:1.25!important;font-weight:700}.content .dkpi .dkpi-label{font-size:11px!important;line-height:1.45!important}.content .dkpi .dkpi-sub{font-size:12px!important;line-height:1.5!important}
+
+/* Cards de obras (aba Projetos): nome da obra em destaque e informações em blocos sombreados */
+.content .municipal-work-card .work-card-heading{border-left:4px solid #0a7cc1!important;padding:2px 0 2px 12px!important}
+.content .municipal-work-card .work-card-heading h3{font-size:18px!important;font-weight:800!important;color:#003856!important;line-height:1.35!important;letter-spacing:-0.1px}
+.content .municipal-work-card .rc-grid{gap:10px!important;border-top:0!important;padding-top:4px!important}
+.content .municipal-work-card .rc-item{background:#f3f7fa;border:1px solid #e1e9ee;border-radius:10px;padding:9px 11px;box-shadow:0 1px 3px rgba(0,56,86,.08),inset 0 1px 0 rgba(255,255,255,.7)}
+.content .municipal-work-card .rc-item span{color:#5b7183!important}
+.content .municipal-work-card .rc-item b{color:#0f2a3d!important;font-weight:700!important}
+/* Topo colorido (cor do status) e status no rodapé, à esquerda de "Abrir obra" */
+.content .municipal-work-card{--rc:var(--wc,#0a7cc1);overflow:hidden}
+.content .municipal-work-card .work-card-heading{margin:0 0 2px!important;padding:14px 16px 14px 14px!important;border:2px solid var(--wc,#0a7cc1)!important;border-left-width:6px!important;border-radius:10px!important;background:#e8f2f9!important;background:color-mix(in srgb,var(--wc,#0a7cc1) 16%,#fff)!important}
+.content .municipal-work-card .rc-foot{justify-content:space-between!important;align-items:center;gap:10px;flex-wrap:wrap}
+.content .municipal-work-card .rc-foot .work-card-status{display:flex;min-height:0;justify-content:flex-start}
+.content .municipal-work-card .rc-open{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+
+/* Justificativas das obras: Alteração feita / Sem alteração + legenda (modal e auditoria) */
+.obra-review{max-width:860px;margin:0 auto}
+.obra-review-legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:0 0 12px;padding:10px 12px;border:1px solid #e1e9ee;border-radius:10px;background:#f8fafc;font-size:12px;color:#334155}
+.orl-item{display:inline-flex;align-items:center;gap:7px}
+.orl-item>i,.obra-review-group h3>i,.audit-review-status>i,.orr-check>i{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;font-size:11px;font-style:normal;font-weight:800;line-height:1;flex:none}
+.orl-item.is-changed>i,.obra-review-group.is-changed h3>i,.audit-review-status.is-changed>i,.orr-check.is-changed.is-on>i{background:#0f8a5f;color:#fff}
+.orl-item.is-unchanged>i,.obra-review-group.is-unchanged h3>i,.audit-review-status.is-unchanged>i,.orr-check.is-unchanged.is-on>i{background:#64748b;color:#fff}
+.orl-item.is-note svg{width:16px;height:16px;color:#003856}
+.obra-review-search{width:100%;margin:0 0 10px}
+.obra-review-group{margin-bottom:14px}
+.obra-review-group h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13.5px;color:#0f2a3d}
+.obra-review-group h3 .org-count{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:#e8eef3;color:#334155;font-size:11px;font-weight:700}
+.org-empty{margin:0;font-size:12px;color:#64748b}
+.obra-review-row{padding:10px 12px;margin-bottom:8px;border:1px solid #e1e9ee;border-left:4px solid #64748b;border-radius:8px;background:#fff}
+.obra-review-row.is-changed{border-left-color:#0f8a5f;background:#f3fbf7}
+.orr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.orr-name{font-size:13px;color:#0f172a;min-width:0;overflow-wrap:anywhere}
+.orr-checks{display:flex;gap:6px;flex-wrap:wrap}
+.orr-check{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 5px;border:1px solid #d5dee6;border-radius:999px;background:#fff;font-size:11.5px;color:#94a3b8;cursor:default}
+.orr-check>i{border:1.5px solid #cbd5e1;background:#fff}
+.orr-check.is-on{color:#0f2a3d;font-weight:700;border-color:currentColor}
+.orr-check.is-changed.is-on{color:#0f6b4a;background:#e7f6ef}
+.orr-check.is-unchanged.is-on{color:#475569;background:#f1f5f9}
+.orr-check.is-on>i{border-color:transparent}
+.orr-changes{margin:6px 0 0 16px;padding:0;font-size:11.5px;color:#475569}
+.orr-just{margin-top:6px}
+.orr-add{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.orr-add svg{width:14px;height:14px}
+.orr-add[hidden],.orr-just textarea[hidden]{display:none!important}
+.orr-just textarea{width:100%;min-height:54px;font-size:12.5px}
+.audit-review-status{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.audit-review-table{min-width:520px!important;margin-top:8px}
+.orr-checks{align-items:center}
+.orr-edit{display:inline-flex;align-items:center;gap:4px;min-height:26px!important;padding:3px 10px!important;font-size:11.5px!important}
+.orr-edit svg{width:13px;height:13px}
+/* Revisão: nome da obra em uma linha; checks e "Editar" logo abaixo, alinhados à esquerda */
+.obra-review-row .orr-top{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:8px}
+.obra-review-row .orr-checks{justify-content:flex-start}
+
+/* Avisos (toast) no canto superior direito, entrando de cima para baixo */
+#toast{top:18px!important;bottom:auto!important;right:22px!important;left:auto!important;z-index:2147482000!important;animation:toastDropIn .22s ease-out!important}
+@keyframes toastDropIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@media(max-width:700px){#toast{top:12px!important;right:12px!important;max-width:calc(100vw - 24px)}}
+@media(prefers-reduced-motion:reduce){#toast{animation:none!important}}
+
+/* Visão geral: obras editadas recentemente / quem editou recentemente */
+.recent-list .att-tag.recent{display:inline-flex;align-items:center;gap:5px;background:#e8f2f9;color:#003856}
+.recent-list .att-tag.recent svg{width:13px;height:13px}
+.dash-editors-msg{margin:0;font-size:13px;color:#64748b}
+.editor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.editor-card{border:1px solid #e1e9ee;border-radius:12px;background:#fff;padding:14px;box-shadow:0 1px 3px rgba(0,56,86,.06)}
+.editor-card header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.editor-card header>div{flex:1;min-width:0}
+.editor-card header b{display:block;color:#0f2a3d;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.editor-card header small{display:block;color:#64748b;font-size:12px}
+.editor-avatar{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#002f47;color:#fff;font-weight:700;font-size:13px;border:2px solid #f37021}
+.editor-count{flex:none;padding:3px 9px;border-radius:999px;background:#fff1e8;color:#b4500e;font-size:11.5px;font-weight:700}
+.editor-card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.editor-card li button{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:1px solid #e8eef3;border-radius:8px;background:#f8fafc;text-align:left;cursor:pointer;font:inherit}
+.editor-card li button:hover,.editor-card li button:focus-visible{border-color:#9cc3dc;background:#eef6fb}
+.editor-card li button span{color:#0f2a3d;font-size:12.5px;font-weight:600;overflow-wrap:anywhere}
+.editor-card li button small{color:#64748b;font-size:11.5px}
+.editor-more{font-size:11.5px;color:#64748b;padding:2px 4px}
+.editor-card header{position:static!important;inset:auto!important;height:auto!important;min-height:0!important;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;color:inherit!important;backdrop-filter:none!important;z-index:auto!important}
+
+/* Responsáveis do projeto: botão "+" e janela de escolha de contas */
+.project .presp-list{align-items:center}
+.presp-add{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:1.5px dashed #f37021;border-radius:50%;background:#fff;color:#c4560f;font-size:18px;font-weight:700;line-height:1;cursor:pointer;transition:background .15s,color .15s}
+.presp-add:hover,.presp-add:focus-visible{background:#f37021;color:#fff;border-style:solid}
+.resp-picker .resp-selected{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;margin:4px 0 14px;padding:10px;border:1px solid #e1e9ee;border-radius:10px;background:#f8fafc}
+.resp-picker .presp-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 3px;border:1px solid #dbe5eb;border-radius:999px;background:#fff;color:#07364c;font-size:12px;font-weight:600}
+.resp-picker .presp-chip i,.resp-option .presp-chip-ico{display:inline-grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:#003856;color:#fff;font-size:10px;font-style:normal;font-weight:700}
+.resp-remove{display:inline-grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:#64748b;cursor:pointer}
+.resp-remove:hover{background:#fde8ea;color:#c93636}
+.resp-remove svg{width:12px;height:12px}
+.resp-picker .presp-empty{font-size:12px;color:#7a8a99}
+.resp-options{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto}
+.resp-option{display:flex;align-items:center;gap:10px;margin:0;padding:8px 10px;border:1px solid #e1e9ee;border-radius:8px;background:#fff;cursor:pointer}
+.resp-option:hover{border-color:#9cc3dc}
+.resp-option.is-on{border-color:#f37021;background:#fff7f1}
+.resp-option input{width:16px!important;height:16px!important;min-width:16px;margin:0!important;accent-color:#f37021}
+.resp-option b{display:block;font-size:13px;color:#0f2a3d}
+.resp-option small{display:block;font-size:11.5px;color:#64748b}
+.resp-error{color:#c93636;font-size:13px}
+.resp-loading{font-size:12px;color:#64748b;margin:4px 0}

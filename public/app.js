@@ -221,20 +221,34 @@ const badge = (s) => {
 };
 const late = (r) => r.prazo && r.prazo < today() && r.status !== 'Concluído';
 
-function persist(action, where, before = '', after = '') {
-  if (action)
+function persist(
+  action,
+  where,
+  before = '',
+  after = '',
+  field = '',
+  serverRecorded = false,
+  details = null
+) {
+  auditLoaded = false;
+  if (action && !serverRecorded)
     db.logs.unshift({
       id: uid(),
       at: new Date().toISOString(),
       who: me()?.name || 'Sistema',
-      user: session,
+      user: window.SECAP_ACTOR_ID || session,
       project: where?.id || '',
       where: where?.name || String(where || 'Portal'),
       action,
+      source: tab === 'bi' ? 'bi' : tab === 'projects' ? 'projects' : tab,
+      details,
+      field: field || (action?.startsWith('Alterou ') ? action.slice(8) : ''),
+      projectName: where?.name || '',
       before,
       after,
     });
-  if (window.SECAP_AUTH) queueSave(db);
+  if (window.SECAP_AUTH) return queueSave(db);
+  return Promise.resolve(true);
 }
 
 let toastTimer = null;
@@ -271,7 +285,7 @@ const navs = [
   ['solicitacoes', 'Solicitações', 'link'],
   ['profile', 'Meu perfil', 'user'],
   ['notes', 'Minhas anotações', 'note'],
-  ['history', 'Registros de alteração', 'history'],
+  ['history', 'Auditoria', 'history'],
   ['admin', 'Administração', 'shield'],
 ];
 
@@ -293,7 +307,11 @@ function openSolicitacoes() {
 }
 
 function go(t, id = '') {
+  if ((t === 'history' || t === 'weekly') && !isSysAdmin())
+    return notify('Auditoria disponível apenas para administradores.', 'error');
+  if (t === 'weekly' && typeof loadWeeklyLog === 'function') queueMicrotask(loadWeeklyLog);
   tableLimit = 50;
+  if (t === 'calendar' && typeof calendarLoaded !== 'undefined') calendarLoaded = false;
   tab = t;
   projectId = id;
   query = '';
@@ -336,13 +354,16 @@ function showLogin() {
 function googleLogin() {
   const el = document.getElementById('socialAuthMessage');
   if (window.SECAP_CLOUD && window.sb) {
+    if (window.SECAPLoading) window.SECAPLoading.show('Redirecionando para o Google…', true);
     window.sb.auth
       .signInWithOAuth({
         provider: 'google',
         options: { redirectTo: location.origin + location.pathname },
       })
       .then(({ error }) => {
-        if (error && el) el.textContent = error.message;
+        if (!error) return;
+        if (window.SECAPLoading) window.SECAPLoading.hide();
+        if (el) el.textContent = error.message;
       });
     return;
   }
@@ -400,7 +421,7 @@ function openAvatarModal() {
     .join('');
   modal(
     'Personalizar avatar',
-    `<p class="avatar-modal-help">Escolha um modelo pronto ou crie seu próprio personagem escolhendo o estilo e digitando uma palavra, nome ou apelido. <a href="https://www.dicebear.com/playground/" target="_blank" rel="noopener noreferrer">Abrir o Playground completo do DiceBear</a>.</p><div class="avatar-options">${choices}</div><section class="avatar-builder"><h3>Monte seu próprio avatar</h3><div class="avatar-builder-controls"><div class="field"><label for="customAvatarStyle">Estilo</label><select id="customAvatarStyle" onchange="updateCustomDicebearPreview()"><option value="adventurer-neutral">Adventurer</option><option value="avataaars">Avataaars</option><option value="big-ears">Big Ears</option><option value="croodles">Croodles</option><option value="lorelei">Lorelei</option><option value="personas">Personas</option></select></div><div class="field"><label for="customAvatarSeed">Nome ou palavra para gerar</label><input id="customAvatarSeed" type="text" value="Meu avatar" maxlength="50" placeholder="Digite seu nome" oninput="updateCustomDicebearPreview()"></div></div><div class="avatar-builder-preview"><img id="customDicebearPreview" src="https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=Meu%20avatar" alt="Prévia do avatar personalizado"><span>Prévia do seu avatar</span></div><button class="btn primary" type="button" onclick="applyCustomDicebearAvatar()">Usar meu avatar</button></section><form class="avatar-custom-form" onsubmit="event.preventDefault();saveCustomAvatar(this)"><div class="field"><label for="customAvatarUrl">Ou use o link de uma foto</label><input id="customAvatarUrl" name="avatarUrl" type="url" placeholder="https://exemplo.com/foto.jpg" autocomplete="url"></div><button class="btn secondary" type="submit">Usar foto</button><button class="btn secondary" type="button" onclick="saveAvatar('')">Remover foto</button></form>`
+    `<p class="avatar-modal-help">Escolha um modelo pronto ou crie seu próprio personagem escolhendo o estilo e digitando uma palavra, nome ou apelido. <a href="https://www.dicebear.com/playground/" target="_blank" rel="noopener noreferrer">Abrir o Playground completo do DiceBear</a>.</p><div class="avatar-options">${choices}</div><section class="avatar-builder"><h3>Monte seu próprio avatar</h3><div class="avatar-builder-controls"><div class="field"><label for="customAvatarStyle">Estilo</label><select id="customAvatarStyle" onchange="updateCustomDicebearPreview()"><option value="adventurer-neutral">Adventurer</option><option value="avataaars">Avataaars</option><option value="big-ears">Big Ears</option><option value="croodles">Croodles</option><option value="lorelei">Lorelei</option><option value="personas">Personas</option></select></div><div class="field"><label for="customAvatarSeed">Nome ou palavra para gerar</label><input id="customAvatarSeed" type="text" value="Meu avatar" maxlength="50" placeholder="Digite seu nome" oninput="updateCustomDicebearPreview()"></div></div><div class="avatar-builder-preview"><img id="customDicebearPreview" src="https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=Meu%20avatar" alt="Prévia do avatar personalizado"><span>Prévia do seu avatar</span></div><button class="btn primary" type="button" onclick="applyCustomDicebearAvatar()">Usar meu avatar</button></section><form class="avatar-custom-form" onsubmit="event.preventDefault();saveCustomAvatar(this)"><div class="field"><label for="customAvatarFile">Enviar uma foto do dispositivo</label><input id="customAvatarFile" name="avatarFile" type="file" accept="image/*" required><small class="avatar-upload-help">Selecione uma imagem para usar como foto do perfil.</small></div><button class="btn secondary" type="submit">Enviar foto</button><button class="btn secondary" type="button" onclick="saveAvatar('')">Remover foto</button></form>`
   );
   updateCustomDicebearPreview();
 }
@@ -433,20 +454,51 @@ function saveAvatar(url) {
   notify('Foto de perfil atualizada.');
 }
 
-function saveCustomAvatar(form) {
-  const value = form.avatarUrl.value.trim();
-  if (!value) {
-    notify('Informe o link da foto.');
+async function saveCustomAvatar(form) {
+  const file = form.avatarFile?.files?.[0];
+  if (!file) {
+    notify('Selecione uma foto para continuar.');
     return;
   }
+  if (!file.type.startsWith('image/')) {
+    notify('Selecione um arquivo de imagem válido.');
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    notify('A foto deve ter no máximo 12 MB.');
+    return;
+  }
+
   try {
-    const parsed = new URL(value);
-    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('URL inválida');
-  } catch {
-    notify('Informe um link válido iniciado por https:// ou http://.');
-    return;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error('Não foi possível abrir essa imagem.'));
+        image.onload = () => {
+          const maxDimension = 512;
+          const ratio = Math.min(
+            1,
+            maxDimension / Math.max(image.naturalWidth, image.naturalHeight)
+          );
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+          const context = canvas.getContext('2d');
+          if (!context) return reject(new Error('Não foi possível processar a foto.'));
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const webp = canvas.toDataURL('image/webp', 0.82);
+          resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.82));
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    saveAvatar(dataUrl);
+  } catch (error) {
+    notify(error.message || 'Não foi possível carregar a foto.');
   }
-  saveAvatar(value);
 }
 
 function render() {
@@ -458,7 +510,9 @@ function render() {
   const u = me(),
     allowed = (n) =>
       ['profile', 'notes', 'solicitacoes'].includes(n) ||
-      (n === 'admin' ? isSysAdmin() : u.role === 'Administrador' || u.tabs.includes(n));
+      (['admin', 'history', 'weekly'].includes(n)
+        ? isSysAdmin()
+        : u.role === 'Administrador' || u.tabs.includes(n));
   if (!allowed(tab)) tab = 'profile';
   $('#app').innerHTML =
     `<div class="stripe"></div><div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img class="brand-logo" src="logo-negative.png" alt="Prefeitura de Goiânia"></div><div class="navlabel">GESTÃO E ACOMPANHAMENTO</div>${navs
@@ -767,7 +821,7 @@ function editRecord(pid, rid = '') {
         <button class="btn" type="button" onclick="closeFullscreenDetail()">${icon('arrow')} Voltar às obras</button>
         <div>
           <span class="eyebrow">${esc(p.name)}</span>
-          <h1 style="margin:0; font-size:20px; color:#0f172a; font-weight:700;">${esc(r.nome || Object.values(r)[1] || 'Registro')}</h1>
+          <h1 class="obra-detail-title" title="${esc(r.nome || Object.values(r)[1] || 'Registro')}">${esc(r.nome || Object.values(r)[1] || 'Registro')}</h1>
         </div>
       </div>
       <div class="actions" style="display:flex; gap:10px;">
@@ -1064,33 +1118,222 @@ function renderProjectsBarChart(projects) {
     }
   });
 }
-// Responsáveis do projeto: o responsável da pasta + os responsáveis informados nas obras.
+// Responsáveis do projeto: contas de usuários escolhidas pelo botão "+".
+// Fica em p.responsibles = [{ id, name, email }]. Os nomes digitados nas obras
+// (campo "Responsável") e o responsável antigo da pasta não aparecem mais aqui.
+function projectResponsibleList(p) {
+  return Array.isArray(p?.responsibles)
+    ? p.responsibles.filter((u) => u && (u.email || u.id))
+    : [];
+}
 function projectResponsibles(p) {
-  const seen = new Set();
-  const names = [];
-  [p.owner, ...(p.records || []).map((r) => r.responsavel)].forEach((v) => {
-    const name = String(v || '').trim();
-    const key = name.toLowerCase();
-    if (name && !seen.has(key)) {
-      seen.add(key);
-      names.push(name);
-    }
-  });
-  if (!names.length)
-    return `<div class="presp"><small>Responsáveis</small><span class="presp-empty">Sem responsável</span></div>`;
+  const list = projectResponsibleList(p);
+  // Somente administradores definem os responsáveis do projeto.
+  const editable = isSysAdmin();
   const MAX = 3;
-  const chips = names
+  const chips = list
     .slice(0, MAX)
-    .map(
-      (n) =>
-        `<span class="presp-chip" title="${esc(n)}"><i aria-hidden="true">${esc(initials(n))}</i>${esc(n)}</span>`
-    )
+    .map((u) => {
+      const name = u.name || u.email;
+      return `<span class="presp-chip" title="${esc(name)}${u.email && u.email !== name ? ' · ' + esc(u.email) : ''}"><i aria-hidden="true">${esc(initials(name))}</i>${esc(name)}</span>`;
+    })
     .join('');
   const more =
-    names.length > MAX
-      ? `<span class="presp-more" title="${esc(names.slice(MAX).join(', '))}">+${names.length - MAX}</span>`
+    list.length > MAX
+      ? `<span class="presp-more" title="${esc(
+          list
+            .slice(MAX)
+            .map((u) => u.name || u.email)
+            .join(', ')
+        )}">+${list.length - MAX}</span>`
       : '';
-  return `<div class="presp"><small>Responsáveis</small><div class="presp-list">${chips}${more}</div></div>`;
+  const add = editable
+    ? `<button type="button" class="presp-add" title="Adicionar responsáveis" aria-label="Adicionar responsáveis ao projeto ${esc(p.name)}" onclick="event.stopPropagation();openProjectResponsibles('${esc(p.id)}')" onkeydown="event.stopPropagation()">+</button>`
+    : '';
+  const empty = list.length ? '' : '<span class="presp-empty">Sem responsável</span>';
+  return `<div class="presp"><small>Responsáveis</small><div class="presp-list">${chips}${more}${empty}${add}</div></div>`;
+}
+
+let responsiblesPicker = null;
+let responsiblesPickerTimer = null;
+
+function openProjectResponsibles(pid) {
+  const p = db.projects.find((x) => String(x.id) === String(pid));
+  if (!p || !isSysAdmin()) return;
+  responsiblesPicker = {
+    pid: String(pid),
+    selected: new Map(projectResponsibleList(p).map((u) => [String(u.email || u.id).toLowerCase(), u])),
+    users: [],
+    query: '',
+    offset: 0,
+    hasMore: false,
+    loading: false,
+    error: '',
+    request: 0,
+  };
+  modal(
+    'Responsáveis do projeto',
+    `<div class="resp-picker">
+       <p class="subtitle">${esc(p.name)} · escolha as contas de usuários responsáveis por este projeto.</p>
+       <div class="resp-selected" id="respSelected" aria-live="polite"></div>
+       <div class="field">
+         <label for="respSearch">Buscar usuário</label>
+         <input id="respSearch" type="search" maxlength="100" placeholder="Nome ou e-mail" autocomplete="off" oninput="searchProjectResponsibles(this.value)">
+       </div>
+       <div class="resp-options" id="respOptions" role="group" aria-label="Contas de usuários"></div>
+     </div>`,
+    btn('Cancelar', 'closeModal()', 'close') +
+      btn('Salvar responsáveis', 'saveProjectResponsibles()', 'check', 'primary')
+  );
+  renderProjectResponsibles();
+  loadProjectResponsibles(false);
+  setTimeout(() => document.getElementById('respSearch')?.focus(), 50);
+}
+
+function responsibleKey(u) {
+  return String(u.email || u.id || '').toLowerCase();
+}
+
+function renderProjectResponsibles() {
+  const state = responsiblesPicker;
+  const sel = document.getElementById('respSelected');
+  const opts = document.getElementById('respOptions');
+  if (!state || !sel || !opts) return;
+  const chosen = [...state.selected.values()];
+  sel.innerHTML = chosen.length
+    ? chosen
+        .map(
+          (u, i) =>
+            `<span class="presp-chip"><i aria-hidden="true">${esc(initials(u.name || u.email))}</i>${esc(u.name || u.email)}<button type="button" class="resp-remove" title="Remover" aria-label="Remover ${esc(u.name || u.email)}" onclick="removeProjectResponsible(${i})">${icon('close')}</button></span>`
+        )
+        .join('')
+    : '<span class="presp-empty">Nenhum responsável selecionado.</span>';
+  if (state.error) {
+    opts.innerHTML = `<p class="resp-error" role="alert">Não foi possível carregar os usuários. ${esc(state.error)}</p><button class="btn" type="button" onclick="loadProjectResponsibles(false)">Tentar novamente</button>`;
+    return;
+  }
+  const rows = state.users
+    .map((u) => {
+      const key = responsibleKey(u);
+      const on = state.selected.has(key);
+      return `<label class="resp-option${on ? ' is-on' : ''}"><input type="checkbox" ${on ? 'checked' : ''} onchange="toggleProjectResponsible('${esc(String(u.id))}', this.checked)"><span class="presp-chip-ico" aria-hidden="true">${esc(initials(u.name || u.email))}</span><span><b>${esc(u.name || u.email)}</b><small>${esc(u.email || '')}</small></span></label>`;
+    })
+    .join('');
+  opts.innerHTML =
+    (rows ||
+      (state.loading ? '' : '<p class="presp-empty">Nenhum usuário encontrado.</p>')) +
+    (state.loading ? '<p class="resp-loading" role="status">Carregando usuários…</p>' : '') +
+    (state.hasMore && !state.loading
+      ? `<button class="textbtn" type="button" onclick="loadProjectResponsibles(true)">Carregar mais usuários</button>`
+      : '');
+}
+
+function toggleProjectResponsible(id, on) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  const u = state.users.find((x) => String(x.id) === String(id));
+  if (!u) return;
+  if (on) state.selected.set(responsibleKey(u), { id: u.id, name: u.name || u.email, email: u.email || '' });
+  else state.selected.delete(responsibleKey(u));
+  renderProjectResponsibles();
+}
+
+function removeProjectResponsible(index) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  const key = [...state.selected.keys()][index];
+  state.selected.delete(key);
+  renderProjectResponsibles();
+}
+
+function searchProjectResponsibles(value) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  state.query = String(value || '').trim();
+  state.request++;
+  clearTimeout(responsiblesPickerTimer);
+  responsiblesPickerTimer = setTimeout(() => {
+    if (responsiblesPicker === state) loadProjectResponsibles(false);
+  }, 220);
+}
+
+// Mesma lista de contas usada na agenda (participantes de reunião).
+async function loadProjectResponsibles(more = false) {
+  const state = responsiblesPicker;
+  if (!state || !document.getElementById('respOptions')) return;
+  const request = ++state.request;
+  if (!more) {
+    state.offset = 0;
+    state.users = [];
+  }
+  state.loading = true;
+  state.error = '';
+  renderProjectResponsibles();
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    let result = await window.sb.rpc('secap_meeting_users', {
+      p_search: state.query,
+      p_offset: state.offset,
+    });
+    if (result.error && (result.error.code === 'PGRST202' || /schema cache/.test(result.error.message || ''))) {
+      if (!isSysAdmin())
+        throw new Error('A lista de usuários ainda não foi instalada neste banco. Solicite ao administrador aplicar supabase/security/meeting_participants.sql.');
+      const term = state.query.replace(/[%,().]/g, '');
+      let directory = window.sb
+        .from('profiles')
+        .select('id,name,email')
+        .in('role', ['administrador', 'usuario'])
+        .order('name')
+        .order('id');
+      if (term) directory = directory.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
+      const fallback = await directory.range(state.offset, state.offset + 50);
+      if (fallback.error) throw fallback.error;
+      result = { data: { users: (fallback.data || []).slice(0, 50), hasMore: (fallback.data || []).length > 50 } };
+    }
+    if (state !== responsiblesPicker || request !== state.request) return;
+    if (result.error) throw result.error;
+    if (!Array.isArray(result.data?.users)) throw new Error('Lista de usuários inválida.');
+    for (const u of result.data.users) {
+      if (!u || !u.email) continue;
+      state.users.push({ id: u.id, name: u.name || u.email, email: u.email });
+    }
+    state.offset += result.data.users.length;
+    state.hasMore = !!result.data.hasMore;
+  } catch (error) {
+    if (state !== responsiblesPicker || request !== state.request) return;
+    state.error = String(error?.message || error);
+    state.hasMore = false;
+  } finally {
+    if (state === responsiblesPicker && request === state.request) state.loading = false;
+  }
+  renderProjectResponsibles();
+}
+
+function saveProjectResponsibles() {
+  const state = responsiblesPicker;
+  const p = state && db.projects.find((x) => String(x.id) === state.pid);
+  if (!p || !isSysAdmin()) return;
+  const before = projectResponsibleList(p)
+    .map((u) => u.name || u.email)
+    .join(', ');
+  p.responsibles = [...state.selected.values()].map((u) => ({
+    id: u.id,
+    name: u.name || u.email,
+    email: u.email || '',
+  }));
+  const after = p.responsibles.map((u) => u.name || u.email).join(', ');
+  responsiblesPicker = null;
+  closeModal();
+  if (before !== after) {
+    persist('Atualizou responsáveis do projeto', p, before || 'Nenhum', after || 'Nenhum', 'Responsáveis');
+    notify(
+      p.responsibles.length
+        ? `${p.responsibles.length} responsável(is) definido(s) para ${p.name}.`
+        : `Responsáveis removidos de ${p.name}.`,
+      'success'
+    );
+  }
+  render();
 }
 let draggedProjectId = '';
 
@@ -1689,11 +1932,9 @@ function projectView() {
       esc(p.name),
       esc(p.description),
       btn('Exportar', `openExport('${p.id}')`, 'download') +
-        (canEdit(p)
-          ? btn('Importar', `openImport('${p.id}')`, 'upload') +
-            btn('Personalizar campos', `editFields('${p.id}')`, 'edit') +
-            btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary')
-          : '')
+        (isSysAdmin() && canEdit(p) ? btn('Importar', `openImport('${p.id}')`, 'upload') : '') +
+        btn('Configurar seções e campos', `editFields('${p.id}')`, 'edit') +
+        (canEdit(p) ? btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary') : '')
     ) +
     `<div class="stats">${stat(
       'OBRAS CADASTRADAS',
@@ -1912,15 +2153,29 @@ function kanban() {
   );
 }
 
+// Permissão por campo definida pelo administrador (Administração > Permissões por campo).
+// Sem fid: pergunta se o usuário tem ao menos um campo liberado no projeto.
+function memberFieldAllowed(pid, fid) {
+  if (typeof getAllowedFieldsForCurrentUser !== 'function') return isSysAdmin();
+  const allowed = getAllowedFieldsForCurrentUser(pid);
+  if (allowed === null) return true;
+  return fid == null ? allowed.length > 0 : allowed.includes(String(fid));
+}
+
 function moveRecord(pid, rid, val) {
   const p = db.projects.find((p) => p.id === pid);
   if (!p || !canEdit(p)) return notify('Edição não permitida.');
   const f = p.fields.find((f) => f.id === kanbanField);
   if (!f?.options.includes(val)) return notify('Essa opção não existe neste projeto.');
+  if (!memberFieldAllowed(pid, kanbanField))
+    return notify(
+      `Você não tem permissão para alterar o campo "${f.name}" neste projeto.`,
+      'error'
+    );
   const r = p.records.find((r) => r.id === rid),
     before = r[kanbanField];
   r[kanbanField] = val;
-  persist(`Alterou ${f.name}`, p, before, val);
+  persist(`Alterou ${f.name}`, p, before, val, f.name, !!window.SECAP_OBRAS_BACKEND);
   if (window.SECAP_OBRAS_BACKEND) {
     window.SECAP_OBRAS_BACKEND.saveObra(p.id, r);
   }
@@ -2205,38 +2460,510 @@ function notes() {
   );
 }
 
-function history() {
-  const logs = db.logs.filter(
-    (l) =>
-      canManage() || (l.project ? visible().some((p) => p.id === l.project) : l.user === session)
+let auditLoaded = false,
+  auditLoading = false,
+  auditRows = [],
+  auditError = '';
+let auditScope = 'projects',
+  auditDetailRecoveryRows = [];
+let auditView = 'recent',
+  auditDateMode = 'all',
+  auditStart = '',
+  auditEnd = '',
+  auditRecovering = false;
+let auditPage = 0,
+  auditCursors = [null],
+  auditNextCursor = null,
+  auditHasMore = false;
+let auditPeriodStart = '',
+  auditPeriodEnd = '',
+  auditAvailableStart = '',
+  auditAvailableEnd = '',
+  auditArchiveEnd = '',
+  auditRequest = 0;
+function resetAuditPages() {
+  auditPage = 0;
+  auditCursors = [null];
+  auditNextCursor = null;
+  auditLoaded = false;
+}
+async function loadAuditLogs() {
+  if (!isSysAdmin()) return;
+  const request = ++auditRequest,
+    cursor = auditCursors[auditPage];
+  auditLoading = true;
+  auditError = '';
+  auditRows = [];
+  const args = {
+    p_view: auditView,
+    p_scope: auditScope,
+    p_start: auditDateMode === 'selected' ? auditStart : null,
+    p_end: auditDateMode === 'selected' ? auditEnd : null,
+    p_before_at: cursor?.at || null,
+    p_before_id: cursor?.id || null,
+    p_archive_end: auditView === 'archive' ? auditArchiveEnd || null : null,
+  };
+  if (tab === 'history') render();
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    if (typeof saveChain !== 'undefined') await saveChain;
+    if (request !== auditRequest) return;
+    const result = await window.sb.rpc('secap_audit_page_scoped', args);
+    if (request !== auditRequest || !isSysAdmin()) return;
+    if (result.error) throw result.error;
+    if (!Array.isArray(result.data?.rows)) throw new Error('Resposta de auditoria inválida.');
+    auditRows = result.data.rows;
+    auditHasMore = !!result.data.hasMore;
+    auditNextCursor = result.data.nextCursor;
+    auditPeriodStart = result.data.periodStart || '';
+    auditPeriodEnd = result.data.periodEnd || '';
+    auditAvailableStart = result.data.availableStart || '';
+    auditAvailableEnd = result.data.availableEnd || '';
+    auditAvailableDates = Array.isArray(result.data.availableDates)
+      ? result.data.availableDates
+      : [];
+    auditPicker = '';
+  } catch (error) {
+    if (request !== auditRequest) return;
+    auditRows = [];
+    auditHasMore = false;
+    auditError =
+      'Não foi possível consultar a auditoria. Verifique a conexão e aplique supabase/security/agenda_audit_update.sql. Detalhe: ' +
+      String(error?.message || error);
+  } finally {
+    if (request === auditRequest) {
+      auditLoading = false;
+      auditLoaded = true;
+      if (tab === 'history' && isSysAdmin()) render();
+    }
+  }
+}
+function refreshAuditLogs() {
+  resetAuditPages();
+  return loadAuditLogs();
+}
+function changeAuditPage(direction) {
+  if (auditLoading) return;
+  if (direction > 0 && auditHasMore) {
+    auditCursors[auditPage + 1] = auditNextCursor;
+    auditPage++;
+  } else if (direction < 0 && auditPage > 0) auditPage--;
+  else return;
+  auditLoaded = false;
+  loadAuditLogs();
+}
+function auditValue(value) {
+  if (value === undefined || value === null || value === '') return '—';
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+// Criação/exclusão de obra guardam a obra inteira; na tabela mostra um resumo.
+function auditObraValue(entry, value) {
+  if (entry && entry.eventId && !entry.fieldId && value && typeof value === 'object')
+    return `Dados da obra (${Object.keys(value).length} campos)`;
+  return auditValue(value);
+}
+function auditShortDate(value, year = false) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return '—';
+  const [y, m, d] = value.split('-');
+  return `${d}/${m}${year ? '/' + y : ''}`;
+}
+function auditRangeLabel(start, end) {
+  const differentYear = start?.slice(0, 4) !== end?.slice(0, 4);
+  return `${auditShortDate(start, differentYear)} – ${auditShortDate(end, differentYear)}`;
+}
+function setAuditScope(scope) {
+  if (!isSysAdmin()) return;
+  auditScope = scope === 'bi' ? 'bi' : 'projects';
+  setAuditView('recent');
+}
+function setAuditView(view) {
+  if (!isSysAdmin()) return;
+  auditView = view === 'archive' ? 'archive' : 'recent';
+  auditArchiveEnd = '';
+  auditStart = '';
+  auditEnd = '';
+  auditDateMode = 'all';
+  auditPeriodStart = '';
+  auditPeriodEnd = '';
+  auditAvailableStart = '';
+  auditAvailableEnd = '';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function shiftAuditArchive(direction) {
+  if (auditView !== 'archive' || !auditPeriodEnd || auditLoading) return;
+  const day = new Date(auditPeriodEnd + 'T12:00:00Z');
+  day.setUTCDate(day.getUTCDate() + 40 * direction);
+  auditArchiveEnd = day.toISOString().slice(0, 10);
+  auditStart = '';
+  auditEnd = '';
+  auditDateMode = 'all';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function applyAuditDates(form) {
+  const data = new FormData(form),
+    start = String(data.get('start') || ''),
+    end = String(data.get('end') || '');
+  if (
+    !start ||
+    !end ||
+    start > end ||
+    start < auditPeriodStart ||
+    end > auditPeriodEnd ||
+    !auditAvailableDates.includes(start) ||
+    !auditAvailableDates.includes(end)
+  )
+    return notify('Selecione datas válidas dentro do período exibido.', 'error');
+  auditStart = start;
+  auditEnd = end;
+  auditDateMode = 'selected';
+  resetAuditPages();
+  loadAuditLogs();
+}
+function showAllAuditDates() {
+  auditDateMode = 'all';
+  auditStart = '';
+  auditEnd = '';
+  resetAuditPages();
+  loadAuditLogs();
+}
+let auditAvailableDates = [],
+  auditPicker = '',
+  auditPickerMonth = '';
+function auditDateControl(field, label, value) {
+  return `<div class="field audit-calendar-field"><label>${label}</label><input type="hidden" id="${field}" name="${field === 'auditStart' ? 'start' : 'end'}" value="${esc(value)}"><button class="audit-date-trigger" type="button" aria-label="${label}" aria-haspopup="dialog" aria-expanded="${auditPicker === field}" onclick="toggleAuditCalendar('${field}')"><span id="${field}Display">${value ? auditShortDate(value, true) : 'dd/mm/aaaa'}</span>${icon('calendar')}</button><div id="${field}Calendar" class="audit-calendar-host"></div></div>`;
+}
+function toggleAuditCalendar(field) {
+  if (auditLoading) return;
+  const old = auditPicker;
+  document.querySelectorAll('.audit-calendar-host').forEach((el) => (el.innerHTML = ''));
+  document
+    .querySelectorAll('.audit-date-trigger')
+    .forEach((el) => el.setAttribute('aria-expanded', 'false'));
+  if (old === field) {
+    auditPicker = '';
+    return;
+  }
+  auditPicker = field;
+  const value =
+    document.getElementById(field)?.value ||
+    (field === 'auditStart' ? auditAvailableStart : auditAvailableEnd) ||
+    auditPeriodStart;
+  auditPickerMonth = value.slice(0, 7);
+  renderAuditCalendar();
+}
+function renderAuditCalendar() {
+  const host = document.getElementById(auditPicker + 'Calendar');
+  if (!host) return;
+  const [year, month] = auditPickerMonth.split('-').map(Number),
+    first = new Date(Date.UTC(year, month - 1, 1, 12));
+  if (Number.isNaN(first.getTime())) return;
+  const days = new Date(Date.UTC(year, month, 0, 12)).getUTCDate(),
+    offset = first.getUTCDay();
+  const available = new Set(auditAvailableDates),
+    selected = document.getElementById(auditPicker)?.value || '';
+  const prev = auditPickerMonth <= auditPeriodStart.slice(0, 7),
+    next = auditPickerMonth >= auditPeriodEnd.slice(0, 7);
+  host.innerHTML = `<div class="audit-calendar" role="dialog" aria-label="Selecionar ${auditPicker === 'auditStart' ? 'data inicial' : 'data final'}" onkeydown="if(event.key==='Escape')closeAuditCalendar()"><div class="audit-calendar-head"><button type="button" aria-label="Mês anterior" ${prev ? 'disabled' : ''} onclick="moveAuditCalendar(-1)">‹</button><strong>${esc(first.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }))}</strong><button type="button" aria-label="Próximo mês" ${next ? 'disabled' : ''} onclick="moveAuditCalendar(1)">›</button></div><div class="audit-calendar-week">${['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((x) => `<span>${x}</span>`).join('')}</div><div class="audit-calendar-days">${'<span></span>'.repeat(offset)}${Array.from(
+    { length: days },
+    (_, i) => {
+      const day = `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+      const enabled = day >= auditPeriodStart && day <= auditPeriodEnd && available.has(day);
+      return `<button type="button" class="${selected === day ? 'is-selected' : ''}" aria-label="${auditShortDate(day, true)}" ${enabled ? '' : 'disabled'} ${selected === day ? 'aria-pressed="true"' : ''} onclick="selectAuditDate('${day}')">${i + 1}</button>`;
+    }
+  ).join(
+    ''
+  )}</div><button class="audit-calendar-close" type="button" onclick="closeAuditCalendar()">Fechar</button></div>`;
+  host.previousElementSibling?.setAttribute('aria-expanded', 'true');
+}
+function moveAuditCalendar(delta) {
+  const [year, month] = auditPickerMonth.split('-').map(Number),
+    d = new Date(Date.UTC(year, month - 1 + delta, 1, 12));
+  const next = d.toISOString().slice(0, 7);
+  if (next < auditPeriodStart.slice(0, 7) || next > auditPeriodEnd.slice(0, 7)) return;
+  auditPickerMonth = next;
+  renderAuditCalendar();
+}
+function selectAuditDate(day) {
+  if (!auditAvailableDates.includes(day) || day < auditPeriodStart || day > auditPeriodEnd) return;
+  const field = auditPicker,
+    input = document.getElementById(field),
+    display = document.getElementById(field + 'Display');
+  if (input) input.value = day;
+  if (display) display.textContent = auditShortDate(day, true);
+  closeAuditCalendar();
+  document.getElementById(field)?.nextElementSibling?.focus();
+}
+function closeAuditCalendar() {
+  document.querySelectorAll('.audit-calendar-host').forEach((el) => (el.innerHTML = ''));
+  document
+    .querySelectorAll('.audit-date-trigger')
+    .forEach((el) => el.setAttribute('aria-expanded', 'false'));
+  auditPicker = '';
+}
+document.addEventListener('click', (e) => {
+  if (auditPicker && !e.target.closest('.audit-calendar-field')) closeAuditCalendar();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && auditPicker) closeAuditCalendar();
+});
+
+function requestAuditRecovery(eventId) {
+  if (!isSysAdmin() || auditRecovering) return;
+  const l = [...auditRows, ...auditDetailRecoveryRows].find((l) => l.eventId === eventId);
+  if (!l?.recoverable || l.recovered)
+    return notify('Esta alteração não pode ser recuperada automaticamente.', 'error');
+  modal(
+    'Recuperar informação anterior',
+    `<div class="audit-recovery-summary"><p>Você está prestes a substituir o valor atual pelo valor anterior do campo indicado.</p>
+    <p><b>Projeto:</b> ${esc(l.projectName)}<br><b>Obra:</b> ${esc(l.recordName || l.recordId)}<br><b>Campo:</b> ${esc(l.field)}</p>
+    <div><b>Valor atual registrado:</b><p>${esc(auditValue(l.after))}</p></div>
+    <div><b>Valor que será recuperado:</b><p>${esc(auditValue(l.before))}</p></div>
+    <p>A recuperação identificará seu usuário na auditoria e manterá a alteração original no histórico.</p></div>`,
+    btn('Cancelar', 'closeModal()', 'close') +
+      btn(
+        'Concordo em voltar',
+        `confirmAuditRecovery('${esc(eventId)}',this)`,
+        'history',
+        'primary'
+      )
   );
+}
+async function confirmAuditRecovery(eventId, button) {
+  if (!isSysAdmin() || auditRecovering) return;
+  auditRecovering = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Recuperando…';
+  }
+  try {
+    if (!window.sb) throw new Error('Conexão indisponível.');
+    if (typeof saveChain !== 'undefined') await saveChain;
+    const result = await window.sb.rpc('secap_recover_audit', {
+      event_id: eventId,
+      agreement: true,
+    });
+    if (result.error) throw result.error;
+    if (!result.data?.ok || !result.data.obra)
+      throw new Error('O servidor não confirmou a recuperação.');
+    const row = result.data.obra;
+    const p = db.projects.find((p) => p.id === row.project_id);
+    if (p) {
+      const i = p.records.findIndex((r) => String(r.id) === String(row.id));
+      const restored = window.SECAP_OBRAS_BACKEND.obraRowToRecord(row);
+      if (i >= 0) p.records[i] = restored;
+    }
+    closeModal();
+    resetAuditPages();
+    await loadAuditLogs();
+    notify('Informação anterior recuperada. A recuperação foi registrada na auditoria.', 'success');
+  } catch (error) {
+    notify('Não foi possível recuperar: ' + String(error?.message || error), 'error');
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Concordo em voltar';
+    }
+  } finally {
+    auditRecovering = false;
+  }
+}
+function isAuditBatch(entry) {
+  return /^Edição em lote de obras/.test(entry.action || '');
+}
+function auditBILabel(entry) {
+  if (entry.source === 'bi' || /\bBI\b/i.test(entry.action || '')) return 'Sim';
+  if (entry.source === 'projects' || entry.eventId || isAuditBatch(entry)) return 'Não';
+  return '—';
+}
+// Justificativas por obra chegam como "[Obra] texto | [Obra 2] texto".
+function auditObraReasons(reason) {
+  const text = String(reason || '');
+  if (!text.startsWith('[')) return null;
+  const map = new Map();
+  for (const m of text.matchAll(/\[([^\]]+)\] ([\s\S]*?)(?= \| \[|$)/g)) map.set(m[1], m[2]);
+  return map.size ? map : null;
+}
+function auditReason(entry) {
+  const reason =
+    entry.details?.reason ||
+    (isAuditBatch(entry)
+      ? String(entry.after || '').match(/Justificativa: ([\s\S]*?)(?: \| Alterações:|$)/)?.[1]
+      : '');
+  if (!reason) return '—';
+  // Registro de uma obra só: mostra apenas a justificativa daquela obra.
+  const byObra = !isAuditBatch(entry) && entry.recordName ? auditObraReasons(reason) : null;
+  return byObra ? byObra.get(entry.recordName) || 'Não informada' : reason;
+}
+// Revisão das obras (Alteração feita / Sem alteração) registrada ao concluir a edição.
+function auditReviewHtml(entry) {
+  const review = Array.isArray(entry.details?.review) ? entry.details.review : null;
+  const checklist = entry.details?.checklist || [];
+  if (!review) {
+    if (!checklist.length) return '';
+    const isReview = checklist.some((c) => /^(Alteração feita|Sem alteração):/.test(c));
+    return `<p><strong>${isReview ? 'Revisão das obras' : 'Tipo de mudança'}:</strong> ${esc(checklist.join('; '))}</p>`;
+  }
+  const changed = review.filter((r) => r.status === 'alterada').length;
+  return `<h4>Revisão das obras</h4>
+    <div class="obra-review-legend" aria-label="Legenda da revisão das obras">
+      <span class="orl-item is-changed"><i aria-hidden="true">✓</i><span><strong>Alteração feita</strong> · ${changed} obra(s)</span></span>
+      <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · ${review.length - changed} obra(s)</span></span>
+      <span class="orl-item is-note">${icon('note')}<span><strong>Justificativa</strong> · opcional, por obra</span></span>
+    </div>
+    <table class="audit-details-table audit-review-table"><thead><tr><th>Obra</th><th>Situação</th><th>Justificativa</th></tr></thead><tbody>${review
+      .map((r) => {
+        const on = r.status === 'alterada';
+        return `<tr><td>${esc(r.recordName || r.recordId || '—')}</td><td><span class="audit-review-status ${on ? 'is-changed' : 'is-unchanged'}"><i aria-hidden="true">✓</i>${on ? 'Alteração feita' : 'Sem alteração'}</span></td><td>${esc(r.justification || 'Não informada')}</td></tr>`;
+      })
+      .join('')}</tbody></table>`;
+}
+function auditDetailChanges(entry) {
+  if (Array.isArray(entry.details?.changes)) return entry.details.changes;
+  if (!isAuditBatch(entry))
+    return [
+      {
+        recordName: entry.recordName || '',
+        action: entry.action,
+        field: entry.field || '—',
+        before: entry.before,
+        after: entry.after,
+      },
+    ];
+  // Compatibilidade com os resumos antigos; preserva o texto quando não há estrutura segura.
+  const parse = (text) => {
+    const result = [];
+    for (const part of String(text || '').split(' | ')) {
+      const match = part.match(/^\[([^\]]+)\] ([\s\S]*)$/);
+      if (!match) continue;
+      for (const field of match[2].split('; ')) {
+        const at = field.indexOf(': ');
+        if (at >= 0)
+          result.push({
+            recordName: match[1],
+            field: field.slice(0, at),
+            value: field.slice(at + 2),
+          });
+      }
+    }
+    return result;
+  };
+  const before = parse(entry.before),
+    after = parse(
+      String(entry.after || '')
+        .split(' | Alterações: ')
+        .slice(1)
+        .join(' | Alterações: ')
+    );
+  if (
+    before.length &&
+    before.length === after.length &&
+    before.every((v, i) => v.recordName === after[i].recordName && v.field === after[i].field)
+  )
+    return before.map((v, i) => ({
+      recordName: v.recordName,
+      action: 'Alterou campo',
+      field: v.field,
+      before: v.value,
+      after: after[i].value,
+    }));
+  return [];
+}
+async function openAuditDetails(index) {
+  if (!isSysAdmin()) return;
+  const entry = auditRows[index];
+  if (!entry) return;
+  const changes = auditDetailChanges(entry);
+  auditDetailRecoveryRows = [];
+  const detailToken = String(Date.now()) + Math.random();
+  modal(
+    'Detalhes da alteração',
+    `<div class="audit-detail-content" data-audit-detail="${detailToken}"><p><strong>Data e hora:</strong> ${esc(new Date(entry.at).toLocaleString('pt-BR'))}</p><p><strong>Ação:</strong> ${esc(entry.action || '—')}</p><p><strong>Responsável:</strong> ${esc(entry.who || 'Não informado')}</p>${Array.isArray(entry.details?.review) ? '' : `<p><strong>Justificativa:</strong> ${esc(auditReason(entry))}</p>`}${auditReviewHtml(entry)}${changes.length ? `<table class="audit-details-table"><thead><tr><th>Obra</th><th>Ação</th><th>Campo</th><th>Registro anterior</th><th>Registro atualizado</th><th>Recuperação</th></tr></thead><tbody>${changes.map((c, changeIndex) => `<tr><td>${esc(c.recordName || entry.recordName || '—')}</td><td>${esc(c.action || 'Alterou campo')}</td><td>${esc(c.field || '—')}</td><td>${esc(auditValue(c.before))}</td><td>${esc(auditValue(c.after))}</td><td data-detail-recovery="${changeIndex}">${entry.eventId && entry.recoverable && entry.fieldId && !entry.recovered ? btn('Recuperar', `requestAuditRecovery('${esc(entry.eventId)}')`, 'history') : entry.recovered ? 'Recuperado' : isAuditBatch(entry) && entry.details?.changes ? 'Consultando…' : 'Indisponível'}</td></tr>`).join('')}</tbody></table>` : `<p>Registro antigo sem detalhamento estruturado. Conteúdo original preservado:</p><h4>Registro anterior</h4><pre>${esc(auditValue(entry.before))}</pre><h4>Registro atualizado</h4><pre>${esc(auditValue(entry.after))}</pre>`}</div>`,
+    btn('Fechar', 'closeModal()', 'close')
+  );
+  if (isAuditBatch(entry) && entry.details?.changes && window.sb) {
+    try {
+      const response = await window.sb.rpc('secap_audit_detail_events', { p_log_id: entry.id });
+      if (document.querySelector('[data-audit-detail]')?.dataset.auditDetail !== detailToken)
+        return;
+      if (response.error) throw response.error;
+      auditDetailRecoveryRows = Array.isArray(response.data) ? response.data : [];
+      for (let i = 0; i < changes.length; i++) {
+        const cell = document.querySelector(`[data-detail-recovery="${i}"]`),
+          event = auditDetailRecoveryRows.find((e) => e.changeIndex === i);
+        if (cell)
+          cell.innerHTML = event?.recoverable
+            ? btn('Recuperar', `requestAuditRecovery('${esc(event.eventId)}')`, 'history')
+            : 'Indisponível';
+      }
+    } catch (error) {
+      if (document.querySelector('[data-audit-detail]')?.dataset.auditDetail !== detailToken)
+        return;
+      document.querySelectorAll('[data-detail-recovery]').forEach((cell) => {
+        cell.textContent = 'Indisponível';
+        cell.title = 'Não foi possível consultar um registro seguro para recuperação.';
+      });
+    }
+  }
+}
+function history() {
+  if (!isSysAdmin())
+    return empty('Acesso restrito', 'Auditoria disponível apenas para administradores.');
+  if (!auditLoaded && !auditLoading) queueMicrotask(loadAuditLogs);
+  const logs = auditRows,
+    archived = auditView === 'archive';
   return (
     head(
-      'TRANSPARÊNCIA DO TRABALHO',
-      'Registros de alteração',
-      'Saiba quem alterou, quando alterou e o que mudou.'
+      'AUDITORIA DO SISTEMA',
+      auditScope === 'bi' ? 'Histórico de BI' : 'Registros de alteração',
+      'Saiba quem alterou, quando alterou e o que mudou.',
+      btn(
+        archived ? 'Registros recentes' : 'Histórico arquivado',
+        `setAuditView('${archived ? 'recent' : 'archive'}')`,
+        'folder'
+      ) +
+        btn(
+          auditScope === 'bi' ? 'Auditoria de obras' : 'Histórico de BI',
+          `setAuditScope('${auditScope === 'bi' ? 'projects' : 'bi'}')`,
+          'chart'
+        ) +
+        btn('Baixar relatório', "openReportExport('audit')", 'download') +
+        btn('Atualizar', 'refreshAuditLogs()', 'history')
     ) +
-    `<div class="banner">${icon(
-      'history'
-    )}<span>Histórico de alterações registrado no servidor.</span></div><section class="panel"><div class="tablewrap"><table><thead><tr><th>Data e hora</th><th>Usuário</th><th>Ação / local</th><th>Antes</th><th>Depois</th></tr></thead><tbody>${logs
-      .map(
-        (l) =>
-          `<tr><td>${new Date(l.at).toLocaleString('pt-BR')}</td><td>${esc(
-            l.who
-          )}</td><td><strong>${esc(l.action)}</strong><div class="desc">${esc(
-            l.where
-          )}</div></td><td style="white-space:normal;max-width:220px">${esc(
-            l.before || '—'
-          )}</td><td style="white-space:normal;max-width:220px">${esc(l.after || '—')}</td></tr>`
-      )
-      .join('')}</tbody></table></div>${
-      logs.length
-        ? ''
-        : empty(
-            'Nenhuma alteração registrada',
-            'Crie ou edite uma obra para ver seu histórico aqui.'
-          )
-    }</section>`
+    `<section class="panel audit-date-panel"><div class="panelbody audit-filter-row">
+    <div class="audit-period-summary"><h2>${archived ? 'Histórico arquivado' : 'Registros recentes'}</h2>
+    <p class="subtitle">${auditAvailableStart ? `Datas com registros: ${esc(auditShortDate(auditAvailableStart, true))} – ${esc(auditShortDate(auditAvailableEnd, true))}` : 'Nenhum registro neste período.'}</p>
+    ${archived ? `<div class="actions audit-period-actions"><button class="textbtn" ${auditLoading ? 'disabled' : ''} onclick="shiftAuditArchive(-1)">← 40 dias anteriores</button><button class="textbtn" ${auditLoading ? 'disabled' : ''} onclick="shiftAuditArchive(1)">40 dias seguintes →</button></div>` : ''}</div>
+    <div class="audit-date-controls"><form class="audit-date-form" onsubmit="event.preventDefault();applyAuditDates(this)">
+    ${auditDateControl('auditStart', 'Data inicial', auditStart)}${auditDateControl('auditEnd', 'Data final', auditEnd)}
+    <button class="btn primary" type="submit" ${auditLoading ? 'disabled' : ''}>Ver datas selecionadas</button><button class="btn" type="button" onclick="showAllAuditDates()" ${auditLoading ? 'disabled' : ''}>Ver tudo</button>
+    </form></div></div></section>
+    ${!window.SECAP_PROFILE_NAME || String(window.SECAP_PROFILE_NAME).includes('@') ? `<div class="banner" role="status"><span>O nome da sua conta ainda não está preenchido no servidor.</span>${btn('Preencher meu nome', "go('profile')", 'user')}</div>` : ''}
+    ${auditError ? `<div class="banner" role="alert">${esc(auditError)}</div>` : ''}
+    ${auditLoading || !auditLoaded ? '<p role="status">Consultando registros…</p>' : ''}
+    <section class="panel audit-panel"><div class="tablewrap"><table aria-label="Registros de alteração"><thead><tr>
+    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Justificativa</th><th>Recuperação</th>
+    </tr></thead><tbody>${logs
+      .map((l, auditIndex) => {
+        const project = db.projects.find((p) => p.id === l.project);
+        const single =
+          isAuditBatch(l) && auditDetailChanges(l).length === 1 ? auditDetailChanges(l)[0] : null;
+        const multiple = isAuditBatch(l) && !single;
+        const field =
+          single?.field || l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
+        const projectName =
+          l.projectName || project?.name || (l.project ? l.where || l.project : '—');
+        const at = new Date(l.at);
+        const recovery = l.recovered
+          ? '<span>Recuperado</span>'
+          : l.eventId && l.recoverable && l.fieldId
+            ? btn('Recuperar', `requestAuditRecovery('${esc(l.eventId)}')`, 'history')
+            : '<span title="Este registro não possui identificação segura da obra e do campo para recuperação automática.">Indisponível</span>';
+        return `<tr><td>${esc(Number.isNaN(at.getTime()) ? '—' : at.toLocaleString('pt-BR'))}</td><td>${esc(l.who || 'Não informado')}</td><td><button type="button" class="textbtn audit-action" onclick="openAuditDetails(${auditIndex})">${esc(l.action || '—')}</button>${l.recoveredFrom ? `<div class="desc">Recuperação do registro ${esc(l.recoveredFrom)}</div>` : ''}</td><td>${esc(projectName)}${l.recordName ? `<div class="desc">${esc(l.recordName)}</div>` : ''}</td><td>${esc(multiple ? '—' : field)}</td><td>${esc(multiple ? '—' : single ? auditValue(single.before) : auditObraValue(l, l.before))}</td><td>${esc(multiple ? '—' : single ? auditValue(single.after) : auditObraValue(l, l.after))}</td><td class="audit-reason">${esc(auditReason(l))}</td><td>${recovery}</td></tr>`;
+      })
+      .join(
+        ''
+      )}</tbody></table></div>${logs.length ? '' : empty('Nenhuma alteração neste período', 'Escolha outro intervalo ou consulte o histórico arquivado.')}<div class="audit-pagination"><button class="btn" ${auditLoading || auditPage === 0 ? 'disabled' : ''} onclick="changeAuditPage(-1)">← Anterior</button><span>Página ${auditPage + 1}</span><button class="btn" ${auditLoading || !auditHasMore ? 'disabled' : ''} onclick="changeAuditPage(1)">Próxima →</button></div></section>`
   );
 }
 
@@ -2261,12 +2988,34 @@ function switchProfile() {
   return false;
 }
 
-function saveProfile(form) {
-  const old = me().name;
-  me().name = new FormData(form).get('name').trim();
-  persist('Atualizou o perfil', 'Meu perfil', old, me().name);
-  render();
-  notify('Perfil atualizado.');
+let profileSaving = false;
+async function saveProfile(form) {
+  if (profileSaving || !me()) return;
+  const name = String(new FormData(form).get('name') || '').trim();
+  if (!name || name.length > 120)
+    return notify('Informe seu nome com até 120 caracteres.', 'error');
+  const button = form.querySelector('button');
+  profileSaving = true;
+  if (button) button.disabled = true;
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    const result = await window.sb.rpc('secap_update_my_name', { new_name: name });
+    if (result.error) throw result.error;
+    if (result.data?.name !== name) throw new Error('O servidor não confirmou seu nome.');
+    const old = me().name;
+    me().name = name;
+    window.SECAP_PROFILE_NAME = name;
+    if (window.SECAP_MEMBER) window.SECAP_MEMBER.name = name;
+    await persist('Atualizou o perfil', 'Meu perfil', old, name);
+    auditLoaded = false;
+    render();
+    notify('Nome salvo na sua conta e atualizado na auditoria.', 'success');
+  } catch (error) {
+    notify('Não foi possível salvar seu nome: ' + String(error?.message || error), 'error');
+  } finally {
+    profileSaving = false;
+    if (button) button.disabled = false;
+  }
 }
 
 function admin() {
@@ -2317,6 +3066,19 @@ function obrasAccessControl(item) {
   </label>`;
 }
 
+// Botão de promover/rebaixar. A própria conta não pode se alterar (o banco também recusa).
+function roleControl(item) {
+  const id = Number(item.id);
+  const mine =
+    String(item.email || '').toLowerCase() === String(window.SECAP_EMAIL || '').toLowerCase();
+  if (item.profile_role === 'administrador') {
+    return mine
+      ? '<span class="role-note">Sua conta</span>'
+      : `<button type="button" class="btn sm role-btn is-demote" onclick="openUserRole(${id}, 'usuario')">Remover administração</button>`;
+  }
+  return `<button type="button" class="btn sm role-btn is-promote" onclick="openUserRole(${id}, 'administrador')">Tornar administrador</button>`;
+}
+
 function renderAccountRequests() {
   const root = document.getElementById('accountRequests');
   if (!root) return;
@@ -2347,9 +3109,13 @@ function renderAccountRequests() {
     (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'usuario'
   );
   const canEditCount = approvedUsers.filter((item) => item.obras_access === 'editar').length;
-  const approvedSummary = approvedUsers.length
-    ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
-    : 'Acesso aprovado';
+  const adminCount = requests.filter(
+    (item) => accessNorm(item.status) === 'aprovada' && item.profile_role === 'administrador'
+  ).length;
+  const approvedSummary =
+    (approvedUsers.length
+      ? `${canEditCount} editam · ${approvedUsers.length - canEditCount} só visualizam`
+      : 'Acesso aprovado') + (adminCount ? ` · ${adminCount} administrador(es)` : '');
 
   const dateLabel = (value) => {
     if (!value) return '—';
@@ -2397,8 +3163,10 @@ function renderAccountRequests() {
         pending
           ? `<button type="button" class="btn primary sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'approve')">Aprovar</button><button type="button" class="btn danger sm" onclick="handleAccountRequestAction(${Number(item.id)}, 'reject')">Recusar</button>`
           : status === 'aprovada' && item.profile_role === 'usuario'
-            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}</div>`
-            : ''
+            ? `<div class="access-controls-pair">${obrasAccessControl(item)}${projectAccessControl(item)}${roleControl(item)}</div>`
+            : status === 'aprovada' && item.profile_role === 'administrador'
+              ? `<div class="access-controls-pair"><span class="role-badge">Administrador</span>${roleControl(item)}</div>`
+              : ''
       }</div>
     </article>`;
     })
@@ -2737,6 +3505,10 @@ const typeNames = {
 };
 
 function editFields(pid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2778,6 +3550,10 @@ function editFields(pid) {
 }
 
 function fieldForm(pid, fid = '') {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid),
     f = p.fields.find((f) => f.id === fid);
   modal(
@@ -2805,6 +3581,10 @@ function fieldForm(pid, fid = '') {
 }
 
 function saveField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   const data = new FormData($('#fieldForm')),
@@ -2831,13 +3611,17 @@ function saveField(pid, fid) {
   const before = old?.name || '';
   if (old) Object.assign(old, f);
   else p.fields.push(f);
-  persist('Personalizou campo', p, before, f.name);
+  persist('Personalizou campo', p, before, f.name, f.name);
   editFields(pid);
   render();
   notify('Campo salvo e conectado às obras.');
 }
 
 function removeField(pid, fid) {
+  if (!isSysAdmin()) {
+    notify('Apenas administradores podem personalizar os campos do projeto.', 'error');
+    return;
+  }
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
   modal(
@@ -2854,20 +3638,22 @@ function confirmRemoveField(pid, fid) {
   const f = p.fields.find((f) => f.id === fid);
   p.fields = p.fields.filter((f) => f.id !== fid);
   p.records.forEach((r) => delete r[fid]);
-  persist('Removeu campo', p, f.name, 'Removido');
+  persist('Removeu campo', p, f.name, 'Removido', f.name);
   editFields(pid);
   render();
 }
 
 function inputField(f, value, disabled) {
   const currentValue = value === null || value === undefined ? '' : String(value);
-  const attrs = `aria-label="${esc(f.name)}" name="${f.id}" ${f.required ? 'required' : ''} ${disabled ? 'disabled' : ''}`;
+  const attrs = `aria-label="${esc(f.name)}" name="${f.id}" data-original-value="${esc(currentValue)}" ${f.required ? 'required' : ''} ${disabled ? 'disabled' : ''}`;
   let input;
 
   if (f.type === 'long') {
     input = `<textarea ${attrs} rows="3">${esc(currentValue)}</textarea>`;
   } else if (f.type === 'select') {
-    const options = Array.isArray(f.options) ? f.options : [];
+    const options = Array.isArray(f.options) ? [...f.options] : [];
+    if (currentValue !== '' && !options.some((option) => String(option) === currentValue))
+      options.unshift(currentValue);
     input = `<select ${attrs}><option value="">Selecione...</option>${options
       .map(
         (option) =>
@@ -2875,7 +3661,7 @@ function inputField(f, value, disabled) {
       )
       .join('')}</select>`;
   } else if (f.type === 'boolean') {
-    input = `<select ${attrs}><option value="">Selecione...</option><option value="Sim" ${currentValue === 'Sim' ? 'selected' : ''}>Sim</option><option value="Não" ${currentValue === 'Não' ? 'selected' : ''}>Não</option></select>`;
+    input = `<select ${attrs}><option value="">Selecione...</option>${currentValue && !['Sim', 'Não'].includes(currentValue) ? `<option value="${esc(currentValue)}" selected>${esc(currentValue)}</option>` : ''}<option value="Sim" ${currentValue === 'Sim' ? 'selected' : ''}>Sim</option><option value="Não" ${currentValue === 'Não' ? 'selected' : ''}>Não</option></select>`;
   } else {
     const inputType =
       { date: 'date', number: 'number', currency: 'number', link: 'url' }[f.type] || 'text';
@@ -2924,7 +3710,7 @@ function editRecord(pid, rid = '') {
         <button class="btn" onclick="closeFullscreenDetail()">${icon('arrow')} Voltar às obras</button>
         <div>
           <span class="eyebrow">${esc(p.name)}</span>
-          <h1 style="margin:0; font-size:20px; color:#0f172a; font-weight:700;">${esc(r.nome || 'Registro')}</h1>
+          <h1 class="obra-detail-title" title="${esc(r.nome || 'Registro')}">${esc(r.nome || 'Registro')}</h1>
         </div>
       </div>
       <div class="actions" style="display:flex; gap:10px;">
@@ -2988,41 +3774,75 @@ function closeFullscreenDetail() {
 function saveRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
   if (!canEdit(p)) return;
+
+  const allowed =
+    typeof getAllowedFieldsForCurrentUser === 'function'
+      ? getAllowedFieldsForCurrentUser(p.id)
+      : isSysAdmin()
+        ? null
+        : [];
+
+  if (allowed !== null && (!Array.isArray(allowed) || allowed.length === 0)) {
+    return notify('Você não possui campos liberados para edição neste projeto.');
+  }
+
   const data = new FormData($('#recordForm')),
     r = p.records.find((r) => r.id === rid),
     values = {};
+
   for (const f of p.fields) {
+    const isFieldAllowed = allowed === null || allowed.includes(f.id);
+
+    // Se o campo estiver bloqueado para este usuário:
+    // - Na edição (r existe), preserva o valor original do banco (evita apagar dado de input disabled ou burlado)
+    // - Na criação de novo registro, grava vazio
+    if (!isFieldAllowed) {
+      values[f.id] = r ? (r[f.id] ?? '') : '';
+      continue;
+    }
+
     const value = data.get(f.id);
     values[f.id] = ['currency', 'number'].includes(f.type)
-      ? value === ''
+      ? value === '' || value === null
         ? ''
         : Number(value)
       : String(value || '').trim();
   }
+
   if (r) {
-    const changes = p.fields.filter((f) => String(r[f.id] ?? '') !== String(values[f.id] ?? ''));
+    const changes = p.fields.filter(
+      (f) =>
+        (allowed === null || allowed.includes(f.id)) &&
+        String(r[f.id] ?? '') !== String(values[f.id] ?? '')
+    );
+
     changes.forEach((f) => {
       const old = r[f.id];
       r[f.id] = values[f.id];
-      persist(`Alterou ${f.name}`, p, String(old ?? ''), String(values[f.id] ?? ''));
+      persist(`Alterou ${f.name}`, p, old, values[f.id], f.name, !!window.SECAP_OBRAS_BACKEND);
     });
-    if (window.SECAP_OBRAS_BACKEND) {
+
+    if (window.SECAP_OBRAS_BACKEND && changes.length > 0) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, r);
     }
   } else {
     const newRecord = { id: uid(), ...values };
     p.records.push(newRecord);
-    persist('Cadastrou obra', p, '', values.nome);
+    // Com o servidor ativo, a criação é registrada pela auditoria do banco (evita duplicar).
+    persist('Cadastrou obra', p, '', values.nome, '', !!window.SECAP_OBRAS_BACKEND);
     if (window.SECAP_OBRAS_BACKEND) {
       window.SECAP_OBRAS_BACKEND.saveObra(p.id, newRecord);
     }
   }
+
   closeModal();
   render();
   notify('Obra salva. Calendário, Kanban e BI atualizados.');
 }
 
 function deleteRecord(pid, rid) {
+  if (!memberFieldAllowed(pid))
+    return notify('Você não possui campos liberados para editar este projeto.', 'error');
   modal(
     'Excluir esta obra?',
     `<p>A obra será removida do portal e de todos os painéis conectados.</p>`,
@@ -3033,7 +3853,7 @@ function deleteRecord(pid, rid) {
 
 async function confirmDeleteRecord(pid, rid) {
   const p = db.projects.find((p) => p.id === pid);
-  if (!p || !canEdit(p)) return;
+  if (!p || !canEdit(p) || !memberFieldAllowed(pid)) return;
   const r = p.records.find((r) => r.id === rid);
   // Primeiro o banco: só tira a obra da tela se a exclusão realmente foi aceita.
   if (window.SECAP_OBRAS_BACKEND) {
@@ -3045,7 +3865,7 @@ async function confirmDeleteRecord(pid, rid) {
     }
   }
   p.records = p.records.filter((x) => x.id !== rid);
-  persist('Excluiu obra', p, r?.nome || '', 'Removida');
+  persist('Excluiu obra', p, r?.nome || '', 'Removida', '', !!window.SECAP_OBRAS_BACKEND);
   closeModal();
   render();
   notify('Obra excluída.');

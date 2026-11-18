@@ -19,6 +19,8 @@ const APP_SCRIPTS = [
   'search-suggest.js',
   'field-rename.js',
   'portal.js',
+  'weekly-log.js',
+  'report-export.js',
 ];
 
 function showBootError(message) {
@@ -274,13 +276,31 @@ async function handleApi(sb, path, init, search = '') {
       return jsonResponse(400, { error: result.error?.message || 'Usuário não encontrado.' });
     return jsonResponse(200, { ok: true });
   }
+  if (path === '/api/account-requests/role' && method === 'POST') {
+    const d = await readBody(init);
+    const id = Number(d.id);
+    if (!Number.isSafeInteger(id) || id < 1 || !['administrador', 'usuario'].includes(d.role)) {
+      return jsonResponse(400, { error: 'Usuário ou perfil inválido.' });
+    }
+    const result = await sb.rpc('secap_set_user_role', { request_id: id, new_role: d.role });
+    if (result.error) return jsonResponse(400, { error: result.error.message });
+    if (!result.data) {
+      return jsonResponse(404, { error: 'Usuário não encontrado ou ainda sem acesso aprovado.' });
+    }
+    return jsonResponse(200, { ok: true, role: d.role });
+  }
   if (path === '/api/account-requests/obras-access' && method === 'POST') {
     return updateObrasAccess(sb, await readBody(init));
   }
   if (path === '/api/obras/save' && method === 'POST') {
-    return saveObraApi(sb, await readBody(init));
+    return saveObraApi(sb, await readBody(init), admin.user, admin.role);
   }
   if (path === '/api/obras/batch-save' && method === 'POST') {
+    if (admin.role !== 'administrador') {
+      return jsonResponse(403, {
+        error: 'Somente o administrador pode importar ou atualizar várias obras de uma vez.',
+      });
+    }
     return batchSaveObrasApi(sb, await readBody(init));
   }
   if (path === '/api/obras/delete' && method === 'POST') {
@@ -415,14 +435,15 @@ async function signInAccount(sb, path, data) {
 }
 
 async function listCalendar(sb, owner) {
-  const { data, error } = await sb.from('calendar_items').select('body').eq('owner', owner);
-  if (error) return jsonResponse(500, { error: error.message });
-  return jsonResponse(200, { items: (data || []).map((row) => row.body) });
+  const { data, error } = await sb.rpc('secap_calendar_list');
+  if(error) return jsonResponse(500, {error:'Não foi possível consultar a agenda. Aplique supabase/security/agenda_audit_update.sql no banco do portal. '+error.message});
+  return jsonResponse(200, {items:data?.items || []});
 }
 
 async function saveCalendar(sb, owner, data) {
   const item = calendarItem(data);
   if (!item) return jsonResponse(400, { error: 'Confira título, data, horário e participantes.' });
+  if(item.kind==='meeting'){const ready=await sb.rpc('secap_calendar_list');if(ready.error)return jsonResponse(400,{error:'Para compartilhar a reunião, aplique supabase/security/agenda_audit_update.sql no banco do portal.'});}
   const { error } = await sb.from('calendar_items').upsert({ id: item.id, owner, body: item });
   if (error) {
     const hidden = error.code === '23505' || error.code === '42501';
@@ -578,14 +599,70 @@ function recordToObraRow(projectId, record) {
   };
 }
 
-async function saveObraApi(sb, data) {
-  const projectId = data.projectId;
-  const record = data.record;
-  if (!projectId || !record || !record.id) {
+async function saveObraApi(sb, data, authUser, authRole) {
+  const projectId = String(data.projectId || '');
+  const incoming = data.record;
+  if (!projectId || !incoming || !incoming.id) {
     return jsonResponse(400, { error: 'Projeto ou registro de obra inválido.' });
   }
+
+  let record = incoming;
+  let rowExists = null;
+  if (authRole !== 'administrador') {
+    // A autorização é conferida no servidor; desabilitar inputs no navegador não é suficiente.
+    const { data: stored, error: stateError } = await sb.rpc('secap_read_state');
+    if (stateError || !stored) {
+      return jsonResponse(500, { error: 'Não foi possível validar as permissões de campos.' });
+    }
+    const project = (stored.projects || []).find((item) => String(item.id) === projectId);
+    if (!project) return jsonResponse(403, { error: 'Você não tem acesso a este projeto.' });
+
+    const profile = await sb.from('profiles').select('email').eq('id', authUser.id).maybeSingle();
+    if (profile.error)
+      return jsonResponse(500, { error: 'Não foi possível identificar seu usuário.' });
+    const email = String(profile.data?.email || authUser.email || '')
+      .trim()
+      .toLowerCase();
+    const rules = stored.fieldPermissions?.[email]?.[projectId];
+    const allowed = Array.isArray(rules) ? new Set(rules.map(String)) : new Set();
+
+    if (!allowed.size) {
+      return jsonResponse(403, {
+        error:
+          'Nenhum campo foi liberado para edição neste projeto. Solicite autorização ao administrador.',
+      });
+    }
+
+    // Em edição, recupera o registro original e só aplica os campos autorizados.
+    const existing = await sb.from('obras').select('*').eq('id', String(incoming.id)).maybeSingle();
+    if (existing.error) return jsonResponse(500, { error: 'Não foi possível validar a obra.' });
+    if (existing.data && String(existing.data.project_id) !== projectId) {
+      return jsonResponse(403, { error: 'A obra não pertence a este projeto.' });
+    }
+
+    rowExists = Boolean(existing.data);
+    const fields = Array.isArray(project.fields) ? project.fields : [];
+    const original = existing.data ? obraRowToRecord(existing.data) : { id: String(incoming.id) };
+    record = { ...original, id: String(incoming.id) };
+    for (const field of fields) {
+      const fieldId = String(field.id);
+      if (allowed.has(fieldId) && Object.prototype.hasOwnProperty.call(incoming, fieldId)) {
+        record[fieldId] = incoming[fieldId];
+      }
+    }
+  }
+
   const row = recordToObraRow(projectId, record);
-  const { error } = await sb.from('obras').upsert(row);
+  // Obra existente: usa UPDATE puro. Um upsert dispara primeiro o gatilho BEFORE INSERT
+  // (tg_op = 'INSERT'), que bloqueia qualquer campo preenchido e não liberado — por isso
+  // o usuário recebia "Sem permissão para editar o campo valor" ao editar outro campo.
+  let error;
+  if (rowExists) {
+    const { id, project_id, nome_planilha, planilha_id, ...changes } = row;
+    ({ error } = await sb.from('obras').update(changes).eq('id', id));
+  } else {
+    ({ error } = await sb.from('obras').upsert(row));
+  }
   if (error) {
     return jsonResponse(400, { error: `Erro ao salvar obra no Supabase: ${error.message}` });
   }
@@ -751,7 +828,8 @@ async function exportBackup(sb, owner) {
       };
     }
   }
-  const agenda = await listCalendar(sb, owner);
+  const ownedAgenda = await sb.from('calendar_items').select('body').eq('owner',owner);
+  const agenda = ownedAgenda.error ? jsonResponse(500,{error:ownedAgenda.error.message}) : jsonResponse(200,{items:(ownedAgenda.data || []).map(row=>row.body)});
   if (!agenda.ok) return agenda;
   const items = await agenda.json();
 }
@@ -820,7 +898,13 @@ async function saveState(sb, owner, path, data) {
   return jsonResponse(200, { ok: true });
 }
 
+// Atualiza a tela de carregamento do login (loading-screen.js), quando visível.
+function loadingStep(message, value) {
+  if (window.SECAPLoading && window.SECAPLoading.active()) window.SECAPLoading.step(message, value);
+}
+
 async function bootCloud(config) {
+  loadingStep('Conectando ao servidor…', 25);
   const { createClient } =
     await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
   const sb = createClient(config.url, config.anonKey, {
@@ -834,7 +918,9 @@ async function bootCloud(config) {
   window.SECAP_CLOUD = true;
   installApi(sb);
 
+  loadingStep('Verificando seu acesso…', 35);
   const existing = await sb.auth.getUser();
+  window.SECAP_ACTOR_ID = existing.data?.user?.id || ''; 
   let email = '';
   let active = false;
   if (existing.data?.user && !existing.error) {
@@ -847,6 +933,7 @@ async function bootCloud(config) {
     if (['administrador', 'usuario'].includes(profile.data?.role)) {
       active = true;
       email = profile.data.email || existing.data.user.email || '';
+      window.SECAP_PROFILE_NAME = String(profile.data.name || '').trim();
       if (profile.data.role === 'usuario') {
         window.SECAP_MEMBER = {
           id: 'member',
@@ -869,10 +956,15 @@ async function bootCloud(config) {
   if (setup.error) throw new Error(setup.error.message);
   let state = null;
   if (active) {
+    loadingStep('Carregando seus projetos…', 50);
     const stored = await sb.rpc('secap_read_state');
     if (stored.error)
       throw new Error('Aplique supabase/security/project_access.sql. ' + stored.error.message);
     state = stored.data;
+    if (!window.SECAP_MEMBER && window.SECAP_PROFILE_NAME && Array.isArray(state?.users)) {
+      const currentAdmin = state.users.find((user) => user.id === 'admin');
+      if (currentAdmin) currentAdmin.name = window.SECAP_PROFILE_NAME;
+    }
     window.SECAP_PROJECTS_BASE = JSON.parse(JSON.stringify(state?.projects || []));
 
     if (state && Array.isArray(state.projects)) {
@@ -882,6 +974,7 @@ async function bootCloud(config) {
       }
 
       // Carrega as obras da tabela dedicada no Supabase
+      loadingStep('Carregando as obras…', 65);
       const { data: obrasRows, error: obrasError } = await sb
         .from('obras')
         .select('*')
@@ -934,6 +1027,11 @@ async function bootCloud(config) {
         'Falha ao salvar obra no backend'
       );
       if (!result.ok) warn(`A obra não foi salva no banco: ${result.error}`);
+      // Mantém a data da última alteração atualizada na tela (Visão geral) sem recarregar.
+      else {
+        if (record && typeof record === 'object') record.updated_at = new Date().toISOString();
+        window.dispatchEvent(new CustomEvent('secap:obra-saved', { detail: { projectId } }));
+      }
       return result;
     },
     batchSave: (projectId, records) =>
@@ -980,8 +1078,11 @@ async function boot() {
         'Configuração do Supabase não encontrada em public/supabase-config.js. Inicie o Supabase CLI local (supabase start).'
       );
     }
+    loadingStep('Preparando painéis e indicadores…', 82);
     await loadScripts(APP_SCRIPTS);
+    if (window.SECAPLoading) window.SECAPLoading.finish();
   } catch (error) {
+    if (window.SECAPLoading) window.SECAPLoading.hide();
     showBootError(error.message || 'Não foi possível iniciar o SECAP.');
   }
 }

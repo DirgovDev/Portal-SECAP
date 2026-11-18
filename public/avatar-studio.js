@@ -1,27 +1,306 @@
 /* DiceBear 10.x editor: choosing a style never saves the profile automatically. */
-const avatarStyleNames='Adventurer,Adventurer Neutral,Avataaars,Avataaars Neutral,Big Ears,Big Ears Neutral,Big Smile,Blobs,Bottts,Bottts Neutral,Cameo,Clay,Constellation,Critters,Croodles,Croodles Neutral,Cutouts,Disco,Dylan,Fun Emoji,Gaze,Glass,Glyphs,Icons,Identicon,Initial Face,Initials,Landscape,Line Face,Loops,Lorelei,Lorelei Neutral,Marbles,Micah,Miniavs,Moods,Notionists,Notionists Neutral,Open Peeps,Patchwork,Personas,Pixel Art,Pixel Art Neutral,Pixelbot,Planets,Rings,Shadows,Shape Grid,Shapes,Slice,Sprouts,Squircles,Stack,Stripes,Thumbs,Toon Head,Triangles,Voxel Art,Voxel Bot,Waves,Weave'.split(',');
-const avatarMinimal=new Set('blobs,disco,glass,glyphs,icons,identicon,initial-face,initials,loops,patchwork,rings,shape-grid,shapes,slice,squircles,stack,stripes,triangles,waves,weave'.split(','));
-const avatarScenes=new Set(['landscape','constellation','planets']);
-const avatarCatalog=avatarStyleNames.map(name=>({name,id:name.toLowerCase().replaceAll(' ','-'),group:avatarScenes.has(name.toLowerCase().replaceAll(' ','-'))?'Cenários':avatarMinimal.has(name.toLowerCase().replaceAll(' ','-'))?'Abstratos e iniciais':'Personagens'}));
-let avatarDraft=null,avatarRequest=0,avatarVariantPage=0;
-function avatarUrl(style,seed,options={}){const params=new URLSearchParams({seed,...options});return 'https://api.dicebear.com/10.x/'+style+'/svg?'+params.toString()}
-function avatarThumbnail(url,alt){return `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.parentElement.classList.add('avatar-image-unavailable')">`}
-openAvatarModal=function(){avatarRequest++;avatarDraft=null;modal('Personalizar avatar',`<div class="avatar-catalog-intro"><p class="subtitle">Escolha um estilo para abrir suas variações e opções de personalização. O avatar só muda depois de salvar.</p><aside class="avatar-current-preview" aria-label="Seu avatar atual">${avatarMarkup(me(),'avatar-current-image')}<small>Avatar atual</small></aside></div><div class="avatar-catalog-tools"><input type="search" id="avatarSearch" placeholder="Buscar estilo de avatar" aria-label="Buscar estilo de avatar" oninput="filterAvatarCatalog()"><select id="avatarCategory" aria-label="Categoria de avatar" onchange="filterAvatarCatalog()"><option value="">Todos os estilos</option><option>Personagens</option><option>Abstratos e iniciais</option><option>Cenários</option></select></div><p id="avatarCatalogCount" class="subtitle">${avatarCatalog.length} estilos disponíveis</p><div class="avatar-style-catalog">${avatarCatalog.map(s=>`<button type="button" class="avatar-style-tile" data-name="${esc(s.name.toLowerCase())}" data-group="${esc(s.group)}" onclick="openAvatarStyle('${s.id}')" aria-label="Personalizar ${s.name}">${avatarThumbnail(avatarUrl(s.id,'SECAP-style'),s.name)}<b>${s.name}</b><small>Ver opções ${icon('arrow')}</small></button>`).join('')}</div><div class="avatar-external-photo"><details><summary>Usar o link de uma foto</summary><form onsubmit="event.preventDefault();saveCustomAvatar(this)"><label for="customAvatarUrl">Endereço da foto</label><input id="customAvatarUrl" name="avatarUrl" type="url" required placeholder="https://exemplo.com/foto.jpg"><button class="btn" type="submit">Usar foto</button></form></details></div><p class="avatar-credits">Estilos e ilustrações: <a href="https://www.dicebear.com/styles/" target="_blank" rel="noopener noreferrer">DiceBear e autores · catálogo e licenças</a>.</p>`,btn('Remover avatar',"saveAvatar('')",'trash')+btn('Fechar','closeModal()','close'));document.querySelector('.dialog').classList.add('avatar-studio-dialog')};
-function filterAvatarCatalog(){const query=document.getElementById('avatarSearch').value.trim().toLowerCase(),group=document.getElementById('avatarCategory').value;let count=0;document.querySelectorAll('.avatar-style-tile').forEach(el=>{const show=(!query||el.dataset.name.includes(query))&&(!group||el.dataset.group===group);el.hidden=!show;if(show)count++});document.getElementById('avatarCatalogCount').textContent=count?count+' estilos disponíveis':'Nenhum estilo encontrado. Ajuste a busca.'}
-async function openAvatarStyle(style){if(!avatarCatalog.some(s=>s.id===style))return;const request=++avatarRequest;let seed='SECAP-avatar',options={};try{const current=new URL(currentAvatar());if(current.hostname==='api.dicebear.com'&&current.pathname.includes('/'+style+'/')){seed=current.searchParams.get('seed')||seed;current.searchParams.forEach((v,k)=>{if(k!=='seed')options[k]=v})}}catch{}avatarDraft={style,seed,options,meta:{},active:'variations'};avatarVariantPage=0;renderAvatarStudio(true);try{const response=await fetch('avatar-options/'+style+'.json');if(!response.ok)throw Error();const meta=await response.json();if(request!==avatarRequest||avatarDraft?.style!==style||!document.getElementById('avatarEditor'))return;avatarDraft.meta=meta;renderAvatarStudio()}catch{if(request===avatarRequest&&document.getElementById('avatarLoadStatus'))document.getElementById('avatarLoadStatus').textContent='Os ajustes deste estilo não carregaram. Você pode escolher uma variação ou tentar outro estilo.'}}
-function avatarOptionLabel(key){const map={seed:'Variações',flip:'Espelhar',scale:'Tamanho do desenho',borderRadius:'Arredondamento',rotate:'Rotação',translateX:'Posição horizontal',translateY:'Posição vertical',backgroundColor:'Cor de fundo',backgroundType:'Tipo de fundo',backgroundRotation:'Rotação do fundo',inkColor:'Cor do contorno',lipsColor:'Cor dos lábios',scleraColor:'Cor do branco dos olhos',teethColor:'Cor dos dentes',throatColor:'Cor interna da boca',tongueColor:'Cor da língua',uvulaColor:'Cor da úvula',radius:'Arredondamento',skinColor:'Cor da pele',hairColor:'Cor do cabelo',eyesColor:'Cor dos olhos',mouthColor:'Cor da boca',clothingColor:'Cor da roupa',clothesColor:'Cor da roupa',accessoriesColor:'Cor dos acessórios',glassesColor:'Cor dos óculos',earringsColor:'Cor dos brincos',facialHairColor:'Cor da barba'};if(map[key])return map[key];const roots={hair:'Cabelo',eyes:'Olhos',eyebrows:'Sobrancelhas',mouth:'Boca',nose:'Nariz',head:'Rosto',face:'Rosto',ears:'Orelhas',glasses:'Óculos',earrings:'Brincos',details:'Detalhes',beard:'Barba',facialHair:'Barba',clothing:'Roupa',clothes:'Roupa',accessories:'Acessórios',hat:'Chapéu',top:'Cabelo / parte superior',body:'Corpo',texture:'Textura',shape:'Forma',background:'Fundo'};for(const [root,label] of Object.entries(roots))if(key===root||key===root+'Variant')return label;else if(key===root+'Probability')return label+' · presença (%)';else if(key===root+'Color')return 'Cor · '+label;return key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase())}
-function avatarOptionKeys(){return Object.keys(avatarDraft.meta).filter(k=>!['seed','size'].includes(k)&&!/^.*Color(Fill|FillStops|Angle|Order)$/.test(k)).sort((a,b)=>{const score=k=>k.endsWith('Variant')?0:k.endsWith('Color')?1:k.endsWith('Probability')?3:2;return score(a)-score(b)})}
-function isMainAvatarOption(key){return key.endsWith('Variant')||['skinColor','hairColor','backgroundColor','clothingColor','clothesColor','flip'].includes(key)||avatarDraft.meta[key]?.type==='enum'&&!key.endsWith('Fill')}
-function avatarTabButton(k){return `<button class="${avatarDraft.active===k?'active':''}" data-option="${esc(k)}" onclick="openAvatarOption(this.dataset.option)">${esc(avatarOptionLabel(k))}${Object.hasOwn(avatarDraft.options,k)?'<span aria-label="Personalizado"> •</span>':''}</button>`}
-function renderAvatarStudio(loading=false){if(!avatarDraft)return;const d=avatarDraft,style=avatarCatalog.find(s=>s.id===d.style),keys=avatarOptionKeys();modal('Personalizar · '+style.name,`<div class="avatar-editor" id="avatarEditor"><aside class="avatar-live"><div class="avatar-live-image"><img id="avatarLiveImage" src="${esc(avatarUrl(d.style,d.seed,d.options))}" alt="Prévia do avatar escolhido" referrerpolicy="no-referrer" onload="document.getElementById('avatarImageStatus').textContent=''" onerror="document.getElementById('avatarImageStatus').textContent='A imagem não carregou. Verifique a conexão com o DiceBear.'"></div><small id="avatarImageStatus" role="status">Carregando prévia…</small><h3>${style.name}</h3><p>Prévia das suas escolhas</p><label for="avatarSeedInput">Código / palavra da variação</label><input id="avatarSeedInput" value="${esc(d.seed)}" maxlength="80" oninput="setAvatarSeed(this.value)" autocomplete="off"><button class="btn" onclick="resetAvatarDraft()">Redefinir ajustes</button><a href="https://www.dicebear.com/styles/${d.style}/" target="_blank" rel="noopener noreferrer">Autor e licença deste estilo</a></aside><section class="avatar-adjustments"><p id="avatarLoadStatus" class="subtitle">${loading?'Carregando opções deste estilo…':'Clique em um item para abrir as opções e ver o resultado na prévia.'}</p><div class="avatar-option-tabs"><button class="${d.active==='variations'?'active':''}" onclick="openAvatarOption('variations')">Variações prontas</button>${keys.filter(isMainAvatarOption).map(avatarTabButton).join('')}</div>${keys.some(k=>!isMainAvatarOption(k))?`<details class="avatar-advanced"><summary>Mais ajustes · cores, presença e enquadramento</summary><div class="avatar-option-tabs">${keys.filter(k=>!isMainAvatarOption(k)).map(avatarTabButton).join('')}</div></details>`:''}<div id="avatarOptionChoices"></div></section></div>`,btn('Voltar aos estilos','openAvatarModal()','arrow')+btn('Salvar avatar','commitAvatarDraft()','check','primary'));document.querySelector('.dialog').classList.add('avatar-studio-dialog');renderAvatarOptionChoices()}
-function openAvatarOption(key){if(!avatarDraft||key!=='variations'&&!avatarDraft.meta[key])return;avatarDraft.active=key;document.querySelectorAll('.avatar-option-tabs button').forEach(b=>b.classList.toggle('active',(b.dataset.option||'variations')===key));renderAvatarOptionChoices()}
-function renderAvatarOptionChoices(){const d=avatarDraft,root=document.getElementById('avatarOptionChoices');if(!d||!root)return;const key=d.active,meta=d.meta[key];if(key==='variations'){root.innerHTML=`<div class="avatar-choice-header"><h3>Escolha uma variação</h3><button class="btn" onclick="avatarVariantPage++;renderAvatarOptionChoices()">Gerar outras</button></div><div class="avatar-variant-grid">${Array.from({length:12},(_,i)=>{const seed='SECAP-'+(avatarVariantPage*12+i+1);return `<button class="avatar-variant ${d.seed===seed?'selected':''}" data-seed="${seed}" onclick="chooseAvatarVariant(this.dataset.seed)" aria-label="Escolher variação ${avatarVariantPage*12+i+1}" aria-pressed="${d.seed===seed}">${avatarThumbnail(avatarUrl(d.style,seed,d.options),'Variação '+(avatarVariantPage*12+i+1))}<span>Opção ${avatarVariantPage*12+i+1}</span></button>`}).join('')}</div>`;return}if(!meta){root.innerHTML='';return}let html=`<div class="avatar-choice-header"><h3>${esc(avatarOptionLabel(key))}</h3><button class="textbtn" data-key="${esc(key)}" onclick="resetAvatarOption(this.dataset.key)">Automático</button></div>`;if(meta.type==='enum'){html+=`<div class="avatar-variant-grid">${(meta.values||[]).map((v,i)=>{const opts=avatarOptionsWith(key,v);return `<button class="avatar-variant ${d.options[key]===String(v)?'selected':''}" data-key="${esc(key)}" data-value="${esc(v)}" onclick="setAvatarOption(this.dataset.key,this.dataset.value)" aria-label="${esc(avatarOptionLabel(key))} opção ${i+1}" aria-pressed="${d.options[key]===String(v)}">${avatarThumbnail(avatarUrl(d.style,d.seed,opts),avatarOptionLabel(key)+' '+(i+1))}<span>${key==='flip'?esc(({none:'Normal',horizontal:'Horizontal',vertical:'Vertical',both:'Ambos'})[v]||v):'Opção '+(i+1)}</span></button>`}).join('')}</div>`}else if(meta.type==='color'){const value=/^[a-fA-F0-9]{6}$/.test(d.options[key]||'')?d.options[key]:'dbeafe';html+=`<p>Escolha uma cor para atualizar a prévia.</p><label class="avatar-color-control"><input type="color" value="#${value}" data-key="${esc(key)}" oninput="setAvatarOption(this.dataset.key,this.value.slice(1),false)"><span id="avatarColorValue">#${value}</span></label><div class="avatar-color-swatches">${['f8fafc','dbeafe','c7e8d5','fce7b0','f8d4e3','d8cdf3','8c5a3c','2c2430','003856','f37021','e7c09d','694d3d'].map(v=>`<button style="background:#${v}" aria-label="Cor #${v}" data-key="${esc(key)}" onclick="setAvatarOption(this.dataset.key,'${v}')"></button>`).join('')}</div>`}else if(['number','range'].includes(meta.type)){html+=`<label class="field">Valor ${Number.isFinite(meta.min)?'('+meta.min+' a '+meta.max+')':''}<input type="number" data-key="${esc(key)}" ${Number.isFinite(meta.min)?`min="${meta.min}"`:''} ${Number.isFinite(meta.max)?`max="${meta.max}"`:''} step="any" value="${esc(d.options[key]||'')}" placeholder="Automático" onchange="setAvatarNumber(this)"></label>`}else if(meta.type==='boolean'){html+=`<select data-key="${esc(key)}" aria-label="${esc(avatarOptionLabel(key))}" onchange="setAvatarOption(this.dataset.key,this.value)"><option value="">Automático</option><option value="true" ${d.options[key]==='true'?'selected':''}>Sim</option><option value="false" ${d.options[key]==='false'?'selected':''}>Não</option></select>`}else{html+=`<label class="field">${esc(avatarOptionLabel(key))}<input maxlength="100" data-key="${esc(key)}" value="${esc(d.options[key]||'')}" onchange="setAvatarOption(this.dataset.key,this.value)"></label>`}root.innerHTML=html}
-function avatarOptionsWith(key,value){const options={...avatarDraft.options,[key]:String(value)},probability=key.endsWith('Variant')?key.replace(/Variant$/,'Probability'):key+'Probability';if(avatarDraft.meta[probability])options[probability]='100';return options}
-function refreshAvatarPreview(){const img=document.getElementById('avatarLiveImage');if(img&&avatarDraft)img.src=avatarUrl(avatarDraft.style,avatarDraft.seed,avatarDraft.options);document.querySelectorAll('.avatar-option-tabs button[data-option]').forEach(b=>{const text=avatarOptionLabel(b.dataset.option);b.textContent=text+(Object.hasOwn(avatarDraft.options,b.dataset.option)?' •':'')})}
-function setAvatarOption(key,value,refresh=true){if(!avatarDraft?.meta[key])return;if(value==='')delete avatarDraft.options[key];else avatarDraft.options=avatarOptionsWith(key,value);refreshAvatarPreview();if(refresh)renderAvatarOptionChoices();else{const hex=document.getElementById('avatarColorValue');if(hex)hex.textContent='#'+value}}
-function setAvatarNumber(input){if(!input.reportValidity())return;setAvatarOption(input.dataset.key,input.value)}
-function resetAvatarOption(key){delete avatarDraft.options[key];const prob=key.replace(/Variant$/,'Probability');if(key.endsWith('Variant'))delete avatarDraft.options[prob];refreshAvatarPreview();renderAvatarOptionChoices()}
-function setAvatarSeed(seed){if(!avatarDraft)return;avatarDraft.seed=seed.trim()||'SECAP-avatar';refreshAvatarPreview();if(avatarDraft.active==='variations')renderAvatarOptionChoices()}
-function chooseAvatarVariant(seed){avatarDraft.seed=seed;document.getElementById('avatarSeedInput').value=seed;refreshAvatarPreview();renderAvatarOptionChoices()}
-function resetAvatarDraft(){avatarDraft.options={};avatarDraft.seed='SECAP-avatar';renderAvatarStudio()}
-function commitAvatarDraft(){if(!avatarDraft)return;const url=avatarUrl(avatarDraft.style,avatarDraft.seed,avatarDraft.options);avatarRequest++;saveAvatar(url);avatarDraft=null}
+const avatarStyleNames =
+  'Adventurer,Adventurer Neutral,Avataaars,Avataaars Neutral,Big Ears,Big Ears Neutral,Big Smile,Blobs,Bottts,Bottts Neutral,Cameo,Clay,Constellation,Critters,Croodles,Croodles Neutral,Cutouts,Disco,Dylan,Fun Emoji,Gaze,Glass,Glyphs,Icons,Identicon,Initial Face,Initials,Landscape,Line Face,Loops,Lorelei,Lorelei Neutral,Marbles,Micah,Miniavs,Moods,Notionists,Notionists Neutral,Open Peeps,Patchwork,Personas,Pixel Art,Pixel Art Neutral,Pixelbot,Planets,Rings,Shadows,Shape Grid,Shapes,Slice,Sprouts,Squircles,Stack,Stripes,Thumbs,Toon Head,Triangles,Voxel Art,Voxel Bot,Waves,Weave'.split(
+    ','
+  );
+const avatarMinimal = new Set(
+  'blobs,disco,glass,glyphs,icons,identicon,initial-face,initials,loops,patchwork,rings,shape-grid,shapes,slice,squircles,stack,stripes,triangles,waves,weave'.split(
+    ','
+  )
+);
+const avatarScenes = new Set(['landscape', 'constellation', 'planets']);
+const avatarCatalog = avatarStyleNames.map((name) => ({
+  name,
+  id: name.toLowerCase().replaceAll(' ', '-'),
+  group: avatarScenes.has(name.toLowerCase().replaceAll(' ', '-'))
+    ? 'Cenários'
+    : avatarMinimal.has(name.toLowerCase().replaceAll(' ', '-'))
+      ? 'Abstratos e iniciais'
+      : 'Personagens',
+}));
+let avatarDraft = null,
+  avatarRequest = 0,
+  avatarVariantPage = 0;
+function avatarUrl(style, seed, options = {}) {
+  const params = new URLSearchParams({ seed, ...options });
+  return 'https://api.dicebear.com/10.x/' + style + '/svg?' + params.toString();
+}
+function avatarThumbnail(url, alt) {
+  return `<img src="${esc(url)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true;this.parentElement.classList.add('avatar-image-unavailable')">`;
+}
+openAvatarModal = function () {
+  avatarRequest++;
+  avatarDraft = null;
+  modal(
+    'Personalizar avatar',
+    `<div class="avatar-catalog-intro"><p class="subtitle">Escolha um estilo para abrir suas variações e opções de personalização. O avatar só muda depois de salvar.</p><aside class="avatar-current-preview" aria-label="Seu avatar atual">${avatarMarkup(me(), 'avatar-current-image')}<small>Avatar atual</small></aside></div><div class="avatar-catalog-tools"><input type="search" id="avatarSearch" placeholder="Buscar estilo de avatar" aria-label="Buscar estilo de avatar" oninput="filterAvatarCatalog()"><select id="avatarCategory" aria-label="Categoria de avatar" onchange="filterAvatarCatalog()"><option value="">Todos os estilos</option><option>Personagens</option><option>Abstratos e iniciais</option><option>Cenários</option></select></div><p id="avatarCatalogCount" class="subtitle">${avatarCatalog.length} estilos disponíveis</p><div class="avatar-style-catalog">${avatarCatalog.map((s) => `<button type="button" class="avatar-style-tile" data-name="${esc(s.name.toLowerCase())}" data-group="${esc(s.group)}" onclick="openAvatarStyle('${s.id}')" aria-label="Personalizar ${s.name}">${avatarThumbnail(avatarUrl(s.id, 'SECAP-style'), s.name)}<b>${s.name}</b><small>Ver opções ${icon('arrow')}</small></button>`).join('')}</div><div class="avatar-external-photo"><details><summary>Enviar uma foto</summary><form onsubmit="event.preventDefault();saveCustomAvatar(this)"><label for="customAvatarFile">Foto do seu dispositivo</label><input id="customAvatarFile" name="avatarFile" type="file" accept="image/*" required><small class="avatar-upload-help">Formatos de imagem (JPG, PNG, WebP…) com até 12 MB. A foto é redimensionada automaticamente.</small><button class="btn" type="submit">Usar foto</button></form></details></div><p class="avatar-credits">Estilos e ilustrações: <a href="https://www.dicebear.com/styles/" target="_blank" rel="noopener noreferrer">DiceBear e autores · catálogo e licenças</a>.</p>`,
+    btn('Remover avatar', "saveAvatar('')", 'trash') + btn('Fechar', 'closeModal()', 'close')
+  );
+  document.querySelector('.dialog').classList.add('avatar-studio-dialog');
+};
+function filterAvatarCatalog() {
+  const query = document.getElementById('avatarSearch').value.trim().toLowerCase(),
+    group = document.getElementById('avatarCategory').value;
+  let count = 0;
+  document.querySelectorAll('.avatar-style-tile').forEach((el) => {
+    const show =
+      (!query || el.dataset.name.includes(query)) && (!group || el.dataset.group === group);
+    el.hidden = !show;
+    if (show) count++;
+  });
+  document.getElementById('avatarCatalogCount').textContent = count
+    ? count + ' estilos disponíveis'
+    : 'Nenhum estilo encontrado. Ajuste a busca.';
+}
+async function openAvatarStyle(style) {
+  if (!avatarCatalog.some((s) => s.id === style)) return;
+  const request = ++avatarRequest;
+  let seed = 'SECAP-avatar',
+    options = {};
+  try {
+    const current = new URL(currentAvatar());
+    if (current.hostname === 'api.dicebear.com' && current.pathname.includes('/' + style + '/')) {
+      seed = current.searchParams.get('seed') || seed;
+      current.searchParams.forEach((v, k) => {
+        if (k !== 'seed') options[k] = v;
+      });
+    }
+  } catch {}
+  avatarDraft = { style, seed, options, meta: {}, active: 'variations' };
+  avatarVariantPage = 0;
+  renderAvatarStudio(true);
+  try {
+    const response = await fetch('avatar-options/' + style + '.json');
+    if (!response.ok) throw Error();
+    const meta = await response.json();
+    if (
+      request !== avatarRequest ||
+      avatarDraft?.style !== style ||
+      !document.getElementById('avatarEditor')
+    )
+      return;
+    avatarDraft.meta = meta;
+    renderAvatarStudio();
+  } catch {
+    if (request === avatarRequest && document.getElementById('avatarLoadStatus'))
+      document.getElementById('avatarLoadStatus').textContent =
+        'Os ajustes deste estilo não carregaram. Você pode escolher uma variação ou tentar outro estilo.';
+  }
+}
+function avatarOptionLabel(key) {
+  const map = {
+    seed: 'Variações',
+    flip: 'Espelhar',
+    scale: 'Tamanho do desenho',
+    borderRadius: 'Arredondamento',
+    rotate: 'Rotação',
+    translateX: 'Posição horizontal',
+    translateY: 'Posição vertical',
+    backgroundColor: 'Cor de fundo',
+    backgroundType: 'Tipo de fundo',
+    backgroundRotation: 'Rotação do fundo',
+    inkColor: 'Cor do contorno',
+    lipsColor: 'Cor dos lábios',
+    scleraColor: 'Cor do branco dos olhos',
+    teethColor: 'Cor dos dentes',
+    throatColor: 'Cor interna da boca',
+    tongueColor: 'Cor da língua',
+    uvulaColor: 'Cor da úvula',
+    radius: 'Arredondamento',
+    skinColor: 'Cor da pele',
+    hairColor: 'Cor do cabelo',
+    eyesColor: 'Cor dos olhos',
+    mouthColor: 'Cor da boca',
+    clothingColor: 'Cor da roupa',
+    clothesColor: 'Cor da roupa',
+    accessoriesColor: 'Cor dos acessórios',
+    glassesColor: 'Cor dos óculos',
+    earringsColor: 'Cor dos brincos',
+    facialHairColor: 'Cor da barba',
+  };
+  if (map[key]) return map[key];
+  const roots = {
+    hair: 'Cabelo',
+    eyes: 'Olhos',
+    eyebrows: 'Sobrancelhas',
+    mouth: 'Boca',
+    nose: 'Nariz',
+    head: 'Rosto',
+    face: 'Rosto',
+    ears: 'Orelhas',
+    glasses: 'Óculos',
+    earrings: 'Brincos',
+    details: 'Detalhes',
+    beard: 'Barba',
+    facialHair: 'Barba',
+    clothing: 'Roupa',
+    clothes: 'Roupa',
+    accessories: 'Acessórios',
+    hat: 'Chapéu',
+    top: 'Cabelo / parte superior',
+    body: 'Corpo',
+    texture: 'Textura',
+    shape: 'Forma',
+    background: 'Fundo',
+  };
+  for (const [root, label] of Object.entries(roots))
+    if (key === root || key === root + 'Variant') return label;
+    else if (key === root + 'Probability') return label + ' · presença (%)';
+    else if (key === root + 'Color') return 'Cor · ' + label;
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+}
+function avatarOptionKeys() {
+  return Object.keys(avatarDraft.meta)
+    .filter(
+      (k) => !['seed', 'size'].includes(k) && !/^.*Color(Fill|FillStops|Angle|Order)$/.test(k)
+    )
+    .sort((a, b) => {
+      const score = (k) =>
+        k.endsWith('Variant') ? 0 : k.endsWith('Color') ? 1 : k.endsWith('Probability') ? 3 : 2;
+      return score(a) - score(b);
+    });
+}
+function isMainAvatarOption(key) {
+  return (
+    key.endsWith('Variant') ||
+    ['skinColor', 'hairColor', 'backgroundColor', 'clothingColor', 'clothesColor', 'flip'].includes(
+      key
+    ) ||
+    (avatarDraft.meta[key]?.type === 'enum' && !key.endsWith('Fill'))
+  );
+}
+function avatarTabButton(k) {
+  return `<button class="${avatarDraft.active === k ? 'active' : ''}" data-option="${esc(k)}" onclick="openAvatarOption(this.dataset.option)">${esc(avatarOptionLabel(k))}${Object.hasOwn(avatarDraft.options, k) ? '<span aria-label="Personalizado"> •</span>' : ''}</button>`;
+}
+function renderAvatarStudio(loading = false) {
+  if (!avatarDraft) return;
+  const d = avatarDraft,
+    style = avatarCatalog.find((s) => s.id === d.style),
+    keys = avatarOptionKeys();
+  modal(
+    'Personalizar · ' + style.name,
+    `<div class="avatar-editor" id="avatarEditor"><aside class="avatar-live"><div class="avatar-live-image"><img id="avatarLiveImage" src="${esc(avatarUrl(d.style, d.seed, d.options))}" alt="Prévia do avatar escolhido" referrerpolicy="no-referrer" onload="document.getElementById('avatarImageStatus').textContent=''" onerror="document.getElementById('avatarImageStatus').textContent='A imagem não carregou. Verifique a conexão com o DiceBear.'"></div><small id="avatarImageStatus" role="status">Carregando prévia…</small><h3>${style.name}</h3><p>Prévia das suas escolhas</p><label for="avatarSeedInput">Código / palavra da variação</label><input id="avatarSeedInput" value="${esc(d.seed)}" maxlength="80" oninput="setAvatarSeed(this.value)" autocomplete="off"><button class="btn" onclick="resetAvatarDraft()">Redefinir ajustes</button><a href="https://www.dicebear.com/styles/${d.style}/" target="_blank" rel="noopener noreferrer">Autor e licença deste estilo</a></aside><section class="avatar-adjustments"><p id="avatarLoadStatus" class="subtitle">${loading ? 'Carregando opções deste estilo…' : 'Clique em um item para abrir as opções e ver o resultado na prévia.'}</p><div class="avatar-option-tabs"><button class="${d.active === 'variations' ? 'active' : ''}" onclick="openAvatarOption('variations')">Variações prontas</button>${keys.filter(isMainAvatarOption).map(avatarTabButton).join('')}</div>${
+      keys.some((k) => !isMainAvatarOption(k))
+        ? `<details class="avatar-advanced"><summary>Mais ajustes · cores, presença e enquadramento</summary><div class="avatar-option-tabs">${keys
+            .filter((k) => !isMainAvatarOption(k))
+            .map(avatarTabButton)
+            .join('')}</div></details>`
+        : ''
+    }<div id="avatarOptionChoices"></div></section></div>`,
+    btn('Voltar aos estilos', 'openAvatarModal()', 'arrow') +
+      btn('Salvar avatar', 'commitAvatarDraft()', 'check', 'primary')
+  );
+  document.querySelector('.dialog').classList.add('avatar-studio-dialog');
+  renderAvatarOptionChoices();
+}
+function openAvatarOption(key) {
+  if (!avatarDraft || (key !== 'variations' && !avatarDraft.meta[key])) return;
+  avatarDraft.active = key;
+  document
+    .querySelectorAll('.avatar-option-tabs button')
+    .forEach((b) => b.classList.toggle('active', (b.dataset.option || 'variations') === key));
+  renderAvatarOptionChoices();
+}
+function renderAvatarOptionChoices() {
+  const d = avatarDraft,
+    root = document.getElementById('avatarOptionChoices');
+  if (!d || !root) return;
+  const key = d.active,
+    meta = d.meta[key];
+  if (key === 'variations') {
+    root.innerHTML = `<div class="avatar-choice-header"><h3>Escolha uma variação</h3><button class="btn" onclick="avatarVariantPage++;renderAvatarOptionChoices()">Gerar outras</button></div><div class="avatar-variant-grid">${Array.from(
+      { length: 12 },
+      (_, i) => {
+        const seed = 'SECAP-' + (avatarVariantPage * 12 + i + 1);
+        return `<button class="avatar-variant ${d.seed === seed ? 'selected' : ''}" data-seed="${seed}" onclick="chooseAvatarVariant(this.dataset.seed)" aria-label="Escolher variação ${avatarVariantPage * 12 + i + 1}" aria-pressed="${d.seed === seed}">${avatarThumbnail(avatarUrl(d.style, seed, d.options), 'Variação ' + (avatarVariantPage * 12 + i + 1))}<span>Opção ${avatarVariantPage * 12 + i + 1}</span></button>`;
+      }
+    ).join('')}</div>`;
+    return;
+  }
+  if (!meta) {
+    root.innerHTML = '';
+    return;
+  }
+  let html = `<div class="avatar-choice-header"><h3>${esc(avatarOptionLabel(key))}</h3><button class="textbtn" data-key="${esc(key)}" onclick="resetAvatarOption(this.dataset.key)">Automático</button></div>`;
+  if (meta.type === 'enum') {
+    html += `<div class="avatar-variant-grid">${(meta.values || [])
+      .map((v, i) => {
+        const opts = avatarOptionsWith(key, v);
+        return `<button class="avatar-variant ${d.options[key] === String(v) ? 'selected' : ''}" data-key="${esc(key)}" data-value="${esc(v)}" onclick="setAvatarOption(this.dataset.key,this.dataset.value)" aria-label="${esc(avatarOptionLabel(key))} opção ${i + 1}" aria-pressed="${d.options[key] === String(v)}">${avatarThumbnail(avatarUrl(d.style, d.seed, opts), avatarOptionLabel(key) + ' ' + (i + 1))}<span>${key === 'flip' ? esc({ none: 'Normal', horizontal: 'Horizontal', vertical: 'Vertical', both: 'Ambos' }[v] || v) : 'Opção ' + (i + 1)}</span></button>`;
+      })
+      .join('')}</div>`;
+  } else if (meta.type === 'color') {
+    const value = /^[a-fA-F0-9]{6}$/.test(d.options[key] || '') ? d.options[key] : 'dbeafe';
+    html += `<p>Escolha uma cor para atualizar a prévia.</p><label class="avatar-color-control"><input type="color" value="#${value}" data-key="${esc(key)}" oninput="setAvatarOption(this.dataset.key,this.value.slice(1),false)"><span id="avatarColorValue">#${value}</span></label><div class="avatar-color-swatches">${['f8fafc', 'dbeafe', 'c7e8d5', 'fce7b0', 'f8d4e3', 'd8cdf3', '8c5a3c', '2c2430', '003856', 'f37021', 'e7c09d', '694d3d'].map((v) => `<button style="background:#${v}" aria-label="Cor #${v}" data-key="${esc(key)}" onclick="setAvatarOption(this.dataset.key,'${v}')"></button>`).join('')}</div>`;
+  } else if (['number', 'range'].includes(meta.type)) {
+    html += `<label class="field">Valor ${Number.isFinite(meta.min) ? '(' + meta.min + ' a ' + meta.max + ')' : ''}<input type="number" data-key="${esc(key)}" ${Number.isFinite(meta.min) ? `min="${meta.min}"` : ''} ${Number.isFinite(meta.max) ? `max="${meta.max}"` : ''} step="any" value="${esc(d.options[key] || '')}" placeholder="Automático" onchange="setAvatarNumber(this)"></label>`;
+  } else if (meta.type === 'boolean') {
+    html += `<select data-key="${esc(key)}" aria-label="${esc(avatarOptionLabel(key))}" onchange="setAvatarOption(this.dataset.key,this.value)"><option value="">Automático</option><option value="true" ${d.options[key] === 'true' ? 'selected' : ''}>Sim</option><option value="false" ${d.options[key] === 'false' ? 'selected' : ''}>Não</option></select>`;
+  } else {
+    html += `<label class="field">${esc(avatarOptionLabel(key))}<input maxlength="100" data-key="${esc(key)}" value="${esc(d.options[key] || '')}" onchange="setAvatarOption(this.dataset.key,this.value)"></label>`;
+  }
+  root.innerHTML = html;
+}
+function avatarOptionsWith(key, value) {
+  const options = { ...avatarDraft.options, [key]: String(value) },
+    probability = key.endsWith('Variant')
+      ? key.replace(/Variant$/, 'Probability')
+      : key + 'Probability';
+  if (avatarDraft.meta[probability]) options[probability] = '100';
+  return options;
+}
+function refreshAvatarPreview() {
+  const img = document.getElementById('avatarLiveImage');
+  if (img && avatarDraft)
+    img.src = avatarUrl(avatarDraft.style, avatarDraft.seed, avatarDraft.options);
+  document.querySelectorAll('.avatar-option-tabs button[data-option]').forEach((b) => {
+    const text = avatarOptionLabel(b.dataset.option);
+    b.textContent = text + (Object.hasOwn(avatarDraft.options, b.dataset.option) ? ' •' : '');
+  });
+}
+function setAvatarOption(key, value, refresh = true) {
+  if (!avatarDraft?.meta[key]) return;
+  if (value === '') delete avatarDraft.options[key];
+  else avatarDraft.options = avatarOptionsWith(key, value);
+  refreshAvatarPreview();
+  if (refresh) renderAvatarOptionChoices();
+  else {
+    const hex = document.getElementById('avatarColorValue');
+    if (hex) hex.textContent = '#' + value;
+  }
+}
+function setAvatarNumber(input) {
+  if (!input.reportValidity()) return;
+  setAvatarOption(input.dataset.key, input.value);
+}
+function resetAvatarOption(key) {
+  delete avatarDraft.options[key];
+  const prob = key.replace(/Variant$/, 'Probability');
+  if (key.endsWith('Variant')) delete avatarDraft.options[prob];
+  refreshAvatarPreview();
+  renderAvatarOptionChoices();
+}
+function setAvatarSeed(seed) {
+  if (!avatarDraft) return;
+  avatarDraft.seed = seed.trim() || 'SECAP-avatar';
+  refreshAvatarPreview();
+  if (avatarDraft.active === 'variations') renderAvatarOptionChoices();
+}
+function chooseAvatarVariant(seed) {
+  avatarDraft.seed = seed;
+  document.getElementById('avatarSeedInput').value = seed;
+  refreshAvatarPreview();
+  renderAvatarOptionChoices();
+}
+function resetAvatarDraft() {
+  avatarDraft.options = {};
+  avatarDraft.seed = 'SECAP-avatar';
+  renderAvatarStudio();
+}
+function commitAvatarDraft() {
+  if (!avatarDraft) return;
+  const url = avatarUrl(avatarDraft.style, avatarDraft.seed, avatarDraft.options);
+  avatarRequest++;
+  saveAvatar(url);
+  avatarDraft = null;
+}
