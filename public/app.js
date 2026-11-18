@@ -221,17 +221,19 @@ const badge = (s) => {
 };
 const late = (r) => r.prazo && r.prazo < today() && r.status !== 'Concluído';
 
-function persist(action, where, before = '', after = '', field = '', serverRecorded = false) {
+function persist(action, where, before = '', after = '', field = '', serverRecorded = false, details = null) {
   auditLoaded = false;
   if (action && !serverRecorded)
     db.logs.unshift({
       id: uid(),
       at: new Date().toISOString(),
       who: me()?.name || 'Sistema',
-      user: session,
+      user: window.SECAP_ACTOR_ID || session,
       project: where?.id || '',
       where: where?.name || String(where || 'Portal'),
       action,
+      source: tab === 'bi' ? 'bi' : tab === 'projects' ? 'projects' : tab,
+      details,
       field: field || (action?.startsWith('Alterou ') ? action.slice(8) : ''),
       projectName: where?.name || '',
       before,
@@ -301,6 +303,7 @@ function go(t, id = '') {
     return notify('Auditoria disponível apenas para administradores.', 'error');
   if (t === 'weekly' && typeof loadWeeklyLog === 'function') queueMicrotask(loadWeeklyLog);
   tableLimit = 50;
+  if(t==='calendar' && typeof calendarLoaded!=='undefined')calendarLoaded=false;
   tab = t;
   projectId = id;
   query = '';
@@ -2230,6 +2233,7 @@ let auditLoaded = false,
   auditLoading = false,
   auditRows = [],
   auditError = '';
+let auditScope = 'projects', auditDetailRecoveryRows = [];
 let auditView = 'recent',
   auditDateMode = 'all',
   auditStart = '',
@@ -2260,6 +2264,7 @@ async function loadAuditLogs() {
   auditRows = [];
   const args = {
     p_view: auditView,
+    p_scope: auditScope,
     p_start: auditDateMode === 'selected' ? auditStart : null,
     p_end: auditDateMode === 'selected' ? auditEnd : null,
     p_before_at: cursor?.at || null,
@@ -2271,7 +2276,7 @@ async function loadAuditLogs() {
     if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
     if (typeof saveChain !== 'undefined') await saveChain;
     if (request !== auditRequest) return;
-    const result = await window.sb.rpc('secap_audit_page', args);
+    const result = await window.sb.rpc('secap_audit_page_scoped', args);
     if (request !== auditRequest || !isSysAdmin()) return;
     if (result.error) throw result.error;
     if (!Array.isArray(result.data?.rows)) throw new Error('Resposta de auditoria inválida.');
@@ -2291,7 +2296,7 @@ async function loadAuditLogs() {
     auditRows = [];
     auditHasMore = false;
     auditError =
-      'Não foi possível consultar a auditoria. Verifique a conexão e aplique o arquivo atualizado supabase/security/audit_admin.sql. Detalhe: ' +
+      'Não foi possível consultar a auditoria. Verifique a conexão e aplique supabase/security/agenda_audit_update.sql. Detalhe: ' +
       String(error?.message || error);
   } finally {
     if (request === auditRequest) {
@@ -2333,6 +2338,11 @@ function auditShortDate(value, year = false) {
 function auditRangeLabel(start, end) {
   const differentYear = start?.slice(0, 4) !== end?.slice(0, 4);
   return `${auditShortDate(start, differentYear)} – ${auditShortDate(end, differentYear)}`;
+}
+function setAuditScope(scope) {
+  if(!isSysAdmin())return;
+  auditScope=scope==='bi'?'bi':'projects';
+  setAuditView('recent');
 }
 function setAuditView(view) {
   if (!isSysAdmin()) return;
@@ -2469,7 +2479,7 @@ document.addEventListener('keydown', (e) => {
 
 function requestAuditRecovery(eventId) {
   if (!isSysAdmin() || auditRecovering) return;
-  const l = auditRows.find((l) => l.eventId === eventId);
+  const l = [...auditRows,...auditDetailRecoveryRows].find((l) => l.eventId === eventId);
   if (!l?.recoverable || l.recovered)
     return notify('Esta alteração não pode ser recuperada automaticamente.', 'error');
   modal(
@@ -2526,6 +2536,55 @@ async function confirmAuditRecovery(eventId, button) {
     auditRecovering = false;
   }
 }
+function isAuditBatch(entry) { return /^Edição em lote de obras/.test(entry.action || ''); }
+function auditBILabel(entry) {
+  if (entry.source === 'bi' || /\bBI\b/i.test(entry.action || '')) return 'Sim';
+  if (entry.source === 'projects' || entry.eventId || isAuditBatch(entry)) return 'Não';
+  return '—';
+}
+function auditReason(entry) {
+  if (entry.details?.reason) return entry.details.reason;
+  if (!isAuditBatch(entry)) return '—';
+  return String(entry.after || '').match(/Justificativa: ([\s\S]*?)(?: \| Alterações:|$)/)?.[1] || '—';
+}
+function auditDetailChanges(entry) {
+  if (Array.isArray(entry.details?.changes)) return entry.details.changes;
+  if (!isAuditBatch(entry)) return [{recordName:entry.recordName || '',action:entry.action,field:entry.field || '—',before:entry.before,after:entry.after}];
+  // Compatibilidade com os resumos antigos; preserva o texto quando não há estrutura segura.
+  const parse = text => {
+    const result=[];
+    for (const part of String(text || '').split(' | ')) {
+      const match=part.match(/^\[([^\]]+)\] ([\s\S]*)$/);if(!match)continue;
+      for(const field of match[2].split('; ')) {const at=field.indexOf(': ');if(at>=0)result.push({recordName:match[1],field:field.slice(0,at),value:field.slice(at+2)});}
+    }return result;
+  };
+  const before=parse(entry.before),after=parse(String(entry.after || '').split(' | Alterações: ').slice(1).join(' | Alterações: '));
+  if(before.length && before.length===after.length && before.every((v,i)=>v.recordName===after[i].recordName&&v.field===after[i].field))return before.map((v,i)=>({recordName:v.recordName,action:'Alterou campo',field:v.field,before:v.value,after:after[i].value}));
+  return [];
+}
+async function openAuditDetails(index) {
+  if(!isSysAdmin())return;
+  const entry=auditRows[index];if(!entry)return;
+  const changes=auditDetailChanges(entry);
+  auditDetailRecoveryRows=[];
+  const detailToken=String(Date.now())+Math.random();
+  modal('Detalhes da alteração',`<div class="audit-detail-content" data-audit-detail="${detailToken}"><p><strong>Data e hora:</strong> ${esc(new Date(entry.at).toLocaleString('pt-BR'))}</p><p><strong>Ação:</strong> ${esc(entry.action || '—')}</p><p><strong>Responsável:</strong> ${esc(entry.who || 'Não informado')}</p><p><strong>Motivo:</strong> ${esc(auditReason(entry))}</p>${entry.details?.checklist?.length?`<p><strong>Tipo de mudança:</strong> ${esc(entry.details.checklist.join('; '))}</p>`:''}${changes.length?`<table class="audit-details-table"><thead><tr><th>Obra</th><th>Ação</th><th>Campo</th><th>Registro anterior</th><th>Registro atualizado</th><th>Recuperação</th></tr></thead><tbody>${changes.map((c,changeIndex)=>`<tr><td>${esc(c.recordName || entry.recordName || '—')}</td><td>${esc(c.action || 'Alterou campo')}</td><td>${esc(c.field || '—')}</td><td>${esc(auditValue(c.before))}</td><td>${esc(auditValue(c.after))}</td><td data-detail-recovery="${changeIndex}">${entry.eventId && entry.recoverable && entry.fieldId && !entry.recovered ? btn('Recuperar',`requestAuditRecovery('${esc(entry.eventId)}')`,'history') : entry.recovered ? 'Recuperado' : isAuditBatch(entry) && entry.details?.changes ? 'Consultando…' : 'Indisponível'}</td></tr>`).join('')}</tbody></table>`:`<p>Registro antigo sem detalhamento estruturado. Conteúdo original preservado:</p><h4>Registro anterior</h4><pre>${esc(auditValue(entry.before))}</pre><h4>Registro atualizado</h4><pre>${esc(auditValue(entry.after))}</pre>`}</div>`,btn('Fechar','closeModal()','close'));
+  if(isAuditBatch(entry) && entry.details?.changes && window.sb) {
+    try {
+      const response=await window.sb.rpc('secap_audit_detail_events',{p_log_id:entry.id});
+      if(document.querySelector('[data-audit-detail]')?.dataset.auditDetail!==detailToken)return;
+      if(response.error)throw response.error;
+      auditDetailRecoveryRows=Array.isArray(response.data)?response.data:[];
+      for(let i=0;i<changes.length;i++){
+        const cell=document.querySelector(`[data-detail-recovery="${i}"]`), event=auditDetailRecoveryRows.find(e=>e.changeIndex===i);
+        if(cell)cell.innerHTML=event?.recoverable?btn('Recuperar',`requestAuditRecovery('${esc(event.eventId)}')`,'history'):'Indisponível';
+      }
+    } catch(error) {
+      if(document.querySelector('[data-audit-detail]')?.dataset.auditDetail!==detailToken)return;
+      document.querySelectorAll('[data-detail-recovery]').forEach(cell=>{cell.textContent='Indisponível';cell.title='Não foi possível consultar um registro seguro para recuperação.';});
+    }
+  }
+}
 function history() {
   if (!isSysAdmin())
     return empty('Acesso restrito', 'Auditoria disponível apenas para administradores.');
@@ -2535,13 +2594,14 @@ function history() {
   return (
     head(
       'AUDITORIA DO SISTEMA',
-      'Registros de alteração',
+      auditScope === 'bi' ? 'Histórico de BI' : 'Registros de alteração',
       'Saiba quem alterou, quando alterou e o que mudou.',
       btn(
         archived ? 'Registros recentes' : 'Histórico arquivado',
         `setAuditView('${archived ? 'recent' : 'archive'}')`,
         'folder'
       ) +
+        btn(auditScope==='bi'?'Auditoria de obras':'Histórico de BI', `setAuditScope('${auditScope==='bi'?'projects':'bi'}')`, 'chart') +
         btn('Baixar relatório', "openReportExport('audit')", 'download') +
         btn('Atualizar', 'refreshAuditLogs()', 'history')
     ) +
@@ -2557,11 +2617,13 @@ function history() {
     ${auditError ? `<div class="banner" role="alert">${esc(auditError)}</div>` : ''}
     ${auditLoading || !auditLoaded ? '<p role="status">Consultando registros…</p>' : ''}
     <section class="panel audit-panel"><div class="tablewrap"><table aria-label="Registros de alteração"><thead><tr>
-    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Recuperação</th>
+    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Motivo</th><th>Recuperação</th>
     </tr></thead><tbody>${logs
-      .map((l) => {
+      .map((l, auditIndex) => {
         const project = db.projects.find((p) => p.id === l.project);
-        const field = l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
+        const single = isAuditBatch(l) && auditDetailChanges(l).length===1 ? auditDetailChanges(l)[0] : null;
+        const multiple = isAuditBatch(l) && !single;
+        const field = single?.field || l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
         const projectName =
           l.projectName || project?.name || (l.project ? l.where || l.project : '—');
         const at = new Date(l.at);
@@ -2570,7 +2632,7 @@ function history() {
           : l.eventId && l.recoverable && l.fieldId
             ? btn('Recuperar', `requestAuditRecovery('${esc(l.eventId)}')`, 'history')
             : '<span title="Este registro não possui identificação segura da obra e do campo para recuperação automática.">Indisponível</span>';
-        return `<tr><td>${esc(Number.isNaN(at.getTime()) ? '—' : at.toLocaleString('pt-BR'))}</td><td>${esc(l.who || 'Não informado')}</td><td>${esc(l.action || '—')}${l.recoveredFrom ? `<div class="desc">Recuperação do registro ${esc(l.recoveredFrom)}</div>` : ''}</td><td>${esc(projectName)}${l.recordName ? `<div class="desc">${esc(l.recordName)}</div>` : ''}</td><td>${esc(field)}</td><td>${esc(auditObraValue(l, l.before))}</td><td>${esc(auditObraValue(l, l.after))}</td><td>${recovery}</td></tr>`;
+        return `<tr><td>${esc(Number.isNaN(at.getTime()) ? '—' : at.toLocaleString('pt-BR'))}</td><td>${esc(l.who || 'Não informado')}</td><td><button type="button" class="textbtn audit-action" onclick="openAuditDetails(${auditIndex})">${esc(l.action || '—')}</button>${l.recoveredFrom ? `<div class="desc">Recuperação do registro ${esc(l.recoveredFrom)}</div>` : ''}</td><td>${esc(projectName)}${l.recordName ? `<div class="desc">${esc(l.recordName)}</div>` : ''}</td><td>${esc(multiple ? '—' : field)}</td><td>${esc(multiple ? '—' : single ? auditValue(single.before) : auditObraValue(l, l.before))}</td><td>${esc(multiple ? '—' : single ? auditValue(single.after) : auditObraValue(l, l.after))}</td><td class="audit-reason">${esc(auditReason(l))}</td><td>${recovery}</td></tr>`;
       })
       .join(
         ''
@@ -3397,8 +3459,7 @@ function saveRecord(pid, rid) {
     return notify('Você não possui campos liberados para edição neste projeto.');
   }
 
-  const form = $('#recordForm');
-  const data = new FormData(form),
+  const data = new FormData($('#recordForm')),
     r = p.records.find((r) => r.id === rid),
     values = {};
 
@@ -3413,15 +3474,6 @@ function saveRecord(pid, rid) {
       continue;
     }
 
-    const control = form.elements.namedItem(f.id);
-    if (
-      r &&
-      (!data.has(f.id) ||
-        (control?.dataset && String(data.get(f.id)) === control.dataset.originalValue))
-    ) {
-      values[f.id] = r[f.id] ?? '';
-      continue;
-    }
     const value = data.get(f.id);
     values[f.id] = ['currency', 'number'].includes(f.type)
       ? value === '' || value === null

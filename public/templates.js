@@ -1534,15 +1534,31 @@ function hasAnyPendingSessionChanges() {
     const originalSaveRecord = window.saveRecord;
     window.saveRecord = function (pid, rid = '') {
       const diffs = collectCurrentFormDiffs(pid, rid);
-      if (secapEditSession.active && String(secapEditSession.pid) === String(pid)) {
+      const isSessionSave = secapEditSession.active && String(secapEditSession.pid) === String(pid);
+
+      if (isSessionSave) {
+        // Registra a obra na sessão antes do salvamento individual. O salvamento
+        // original continua responsável por persistir os dados no backend.
         stageObraChangesInSession(pid, rid, diffs, true);
         secapEditSession.isSwitchingObra = true;
       }
+
+      let result;
       try {
-        return originalSaveRecord.apply(this, arguments);
+        result = originalSaveRecord.apply(this, arguments);
       } finally {
         secapEditSession.isSwitchingObra = false;
       }
+
+      // Ao clicar em "Salvar alterações", solicita a justificativa imediatamente,
+      // antes de deixar o usuário voltar à listagem e continuar pelas demais obras.
+      if (isSessionSave && diffs.length > 0 && hasAnyPendingSessionChanges()) {
+        openExitAuditChecklistModal(() => {
+          if (typeof render === 'function') render();
+        });
+      }
+
+      return result;
     };
     window.saveRecord.__secapSessionHooked = true;
   }
@@ -1730,7 +1746,21 @@ function submitExitAuditChecklist() {
   ].join(' | ');
 
   if (p && typeof persist === 'function') {
-    persist(`Edição em lote de obras (${modifiedRecords.length})`, p, beforeSummary, afterSummary);
+    persist(`Edição em lote de obras (${modifiedRecords.length})`, p, '', '', '', false, {
+      reason: reasonText || 'Não informada',
+      checklist: checklistLabels,
+      changes: modifiedRecords.flatMap((item) =>
+        item.changes.map((c) => ({
+          recordId: item.rid,
+          recordName: item.obraNome,
+          fieldId: c.fieldId,
+          action: 'Alterou campo',
+          field: c.fieldName,
+          before: c.beforeRaw ?? c.before,
+          after: c.afterRaw ?? c.after,
+        }))
+      ),
+    });
   }
 
   const exitCallback = window.__pendingExitAuditCallback;
@@ -1743,13 +1773,15 @@ function submitExitAuditChecklist() {
       : 'Alterações e justificativa registradas na aba de auditoria.'
   );
 
-  if (typeof exitCallback === 'function') {
-    secapEditSession.bypassExitGuard = true;
-    try {
-      exitCallback();
-    } finally {
-      secapEditSession.bypassExitGuard = false;
-    }
+  secapEditSession.bypassExitGuard = true;
+  try {
+    if (typeof exitCallback === 'function') exitCallback();
+
+    // Depois de concluir a auditoria, fecha também a janela/aba de edição
+    // para não deixar o formulário da obra aberto.
+    if (typeof window.closeModal === 'function') window.closeModal();
+  } finally {
+    secapEditSession.bypassExitGuard = false;
   }
 
   if (typeof render === 'function') render();
@@ -2058,7 +2090,6 @@ editRecord = function (pid, rid = '') {
 
   document.body.appendChild(detailContainer);
 };
-
 openRecordForm = function (pid, rid = '') {
   const p = visible().find((project) => project.id === pid);
   if (!p) return;
@@ -2171,7 +2202,6 @@ openRecordForm = function (pid, rid = '') {
         : '') +
       obraFooterNavButtons
   );
-
   // Restaura nos campos o que já foi alterado nesta obra caso você tenha ido e voltado entre obras
   if (rid) restoreStagedValuesToForm(rid);
 };

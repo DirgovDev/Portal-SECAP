@@ -435,14 +435,15 @@ async function signInAccount(sb, path, data) {
 }
 
 async function listCalendar(sb, owner) {
-  const { data, error } = await sb.from('calendar_items').select('body').eq('owner', owner);
-  if (error) return jsonResponse(500, { error: error.message });
-  return jsonResponse(200, { items: (data || []).map((row) => row.body) });
+  const { data, error } = await sb.rpc('secap_calendar_list');
+  if(error) return jsonResponse(500, {error:'Não foi possível consultar a agenda. Aplique supabase/security/agenda_audit_update.sql no banco do portal. '+error.message});
+  return jsonResponse(200, {items:data?.items || []});
 }
 
 async function saveCalendar(sb, owner, data) {
   const item = calendarItem(data);
   if (!item) return jsonResponse(400, { error: 'Confira título, data, horário e participantes.' });
+  if(item.kind==='meeting'){const ready=await sb.rpc('secap_calendar_list');if(ready.error)return jsonResponse(400,{error:'Para compartilhar a reunião, aplique supabase/security/agenda_audit_update.sql no banco do portal.'});}
   const { error } = await sb.from('calendar_items').upsert({ id: item.id, owner, body: item });
   if (error) {
     const hidden = error.code === '23505' || error.code === '42501';
@@ -606,6 +607,7 @@ async function saveObraApi(sb, data, authUser, authRole) {
   }
 
   let record = incoming;
+  let rowExists = null;
   if (authRole !== 'administrador') {
     // A autorização é conferida no servidor; desabilitar inputs no navegador não é suficiente.
     const { data: stored, error: stateError } = await sb.rpc('secap_read_state');
@@ -638,6 +640,7 @@ async function saveObraApi(sb, data, authUser, authRole) {
       return jsonResponse(403, { error: 'A obra não pertence a este projeto.' });
     }
 
+    rowExists = Boolean(existing.data);
     const fields = Array.isArray(project.fields) ? project.fields : [];
     const original = existing.data ? obraRowToRecord(existing.data) : { id: String(incoming.id) };
     record = { ...original, id: String(incoming.id) };
@@ -650,7 +653,16 @@ async function saveObraApi(sb, data, authUser, authRole) {
   }
 
   const row = recordToObraRow(projectId, record);
-  const { error } = await sb.from('obras').upsert(row);
+  // Obra existente: usa UPDATE puro. Um upsert dispara primeiro o gatilho BEFORE INSERT
+  // (tg_op = 'INSERT'), que bloqueia qualquer campo preenchido e não liberado — por isso
+  // o usuário recebia "Sem permissão para editar o campo valor" ao editar outro campo.
+  let error;
+  if (rowExists) {
+    const { id, project_id, nome_planilha, planilha_id, ...changes } = row;
+    ({ error } = await sb.from('obras').update(changes).eq('id', id));
+  } else {
+    ({ error } = await sb.from('obras').upsert(row));
+  }
   if (error) {
     return jsonResponse(400, { error: `Erro ao salvar obra no Supabase: ${error.message}` });
   }
@@ -816,7 +828,8 @@ async function exportBackup(sb, owner) {
       };
     }
   }
-  const agenda = await listCalendar(sb, owner);
+  const ownedAgenda = await sb.from('calendar_items').select('body').eq('owner',owner);
+  const agenda = ownedAgenda.error ? jsonResponse(500,{error:ownedAgenda.error.message}) : jsonResponse(200,{items:(ownedAgenda.data || []).map(row=>row.body)});
   if (!agenda.ok) return agenda;
   const items = await agenda.json();
 }
@@ -900,6 +913,7 @@ async function bootCloud(config) {
   installApi(sb);
 
   const existing = await sb.auth.getUser();
+  window.SECAP_ACTOR_ID = existing.data?.user?.id || ''; 
   let email = '';
   let active = false;
   if (existing.data?.user && !existing.error) {

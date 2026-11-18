@@ -653,11 +653,14 @@ function ensureProjectMilestones(p) {
 }
 
 const MILESTONE_STATUS = {
-  progress: { label: 'Em progresso', bg: '#00a3d7', color: '#ffffff', next: 'done' },
-  done: { label: 'Concluído', bg: '#268c48', color: '#ffffff', next: 'stuck' },
-  stuck: { label: 'Cancelado', bg: '#d63649', color: '#ffffff', next: 'canceled_black' },
-  canceled_black: { label: 'Cancelado', bg: '#181b20', color: '#ffffff', next: 'progress' },
+  progress: { label:'Em andamento', bg:'#007EFF', color:'#ffffff', next:'done' },
+  done: { label:'Concluído', bg:'#00DE94', color:'#003247', next:'started' },
+  started: { label:'Iniciado', bg:'#ffffff', color:'#003247', next:'canceled_black' },
+  canceled_black: { label:'Cancelado', bg:'#000000', color:'#ffffff', next:'paused' },
+  paused: { label:'Paralisado', bg:'#DC2626', color:'#ffffff', next:'planning' },
+  planning: { label:'Em planejamento', bg:'#FFBF00', color:'#003247', next:'progress' },
 };
+function msStatusKey(value) { return value==='stuck'?'canceled_black':Object.hasOwn(MILESTONE_STATUS,value)?value:'progress'; }
 
 const PHASE_PALETTE = ['#003856', '#f36e22', '#00a3d7', '#268c48'];
 
@@ -668,24 +671,13 @@ function getSystemUsersList() {
   return [];
 }
 
-function renderOwnerBadge(ownerId) {
+function renderOwnerBadge(ownerId, ownerName = '') {
   const users = getSystemUsersList();
   const u = users.find((x) => String(x.id || x.email) === String(ownerId));
-  if (!u) {
-    return `<div class="ms-avatar ms-avatar-empty" title="Atribuir responsável">+</div>`;
-  }
-  const name = u.name || u.full_name || u.email || 'Usuário';
-  if (u.avatar || u.photo_url) {
-    return `<img class="ms-avatar" src="${esc(u.avatar || u.photo_url)}" alt="${esc(name)}" title="${esc(name)}">`;
-  }
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join('')
-    .toUpperCase();
-  return `<div class="ms-avatar" title="${esc(name)}">${esc(initials)}</div>`;
+  const name=String(ownerName || u?.name || u?.full_name || u?.email || '').trim();
+  if(!name)return `<span class="ms-avatar ms-avatar-empty" title="Atribuir responsável">+</span>`;
+  const initials=name.split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();
+  return `<span class="ms-owner-display"><span class="ms-avatar" aria-hidden="true">${esc(initials)}</span><span class="ms-owner-name">${esc(name)}</span></span>`;
 }
 
 function biDetails(p) {
@@ -711,7 +703,7 @@ function biDetails(p) {
 
           const rowsHtml = items
             .map((item) => {
-              const st = MILESTONE_STATUS[item.status] || MILESTONE_STATUS.progress;
+              const statusKey = msStatusKey(item.status), st = MILESTONE_STATUS[statusKey];
               const pct = Math.max(0, Math.min(100, Number(item.progress) || 0));
               const barBg =
                 pct === 100 ? '#268c48' : 'linear-gradient(90deg, #003856 0%, #00a3d7 100%)';
@@ -727,17 +719,14 @@ function biDetails(p) {
                 />
               </div>
 
-              <div class="ms-cell ms-cell-owner" onclick="msOpenOwnerMenu(event, '${realProject.id}', '${phase.id}', '${item.id}')">
-                ${renderOwnerBadge(item.ownerId)}
-              </div>
+              <button type="button" class="ms-cell ms-cell-owner ms-owner-trigger" aria-label="Definir responsável do marco ${esc(item.title)}" ${canEdit(realProject)?'':'disabled'} onclick="msOpenOwnerMenu(event, '${realProject.id}', '${phase.id}', '${item.id}')">
+                ${renderOwnerBadge(item.ownerId, item.ownerName)}
+              </button>
 
               <div class="ms-cell">
-                <span
-                  class="ms-cell-status"
-                  style="background-color: ${st.bg}; color: ${st.color};"
-                  title="Clique para alternar o status"
-                  onclick="msCycleStatus('${realProject.id}', '${phase.id}', '${item.id}')"
-                >${st.label}</span>
+                <select class="ms-cell-status ms-status-select" aria-label="Status do marco ${esc(item.title)}" style="background-color:${st.bg};color:${st.color};border:1px solid ${statusKey==='started'?'#b8c7cf':st.bg}" ${canEdit(realProject)?'':'disabled'} onchange="msSetStatus('${realProject.id}','${phase.id}','${item.id}',this.value)">
+                  ${Object.entries(MILESTONE_STATUS).map(([key,value])=>`<option value="${key}" ${key===statusKey?'selected':''}>${value.label}</option>`).join('')}
+                </select>
               </div>
 
               <div class="ms-cell ms-cell-timeline" title="Clique na barra para ajustar o progresso (${pct}%)" onclick="msClickTimeline(event, '${realProject.id}', '${phase.id}', '${item.id}')">
@@ -896,16 +885,18 @@ window.msDeleteItem = function (projectId, phaseId, itemId) {
   }
 };
 
-window.msCycleStatus = function (projectId, phaseId, itemId) {
-  const p = msGetProject(projectId);
-  if (!p) return;
-  const phase = ensureProjectMilestones(p).find((x) => x.id === phaseId);
-  const item = phase?.items.find((x) => x.id === itemId);
-  if (!item) return;
-  const current = MILESTONE_STATUS[item.status] || MILESTONE_STATUS.progress;
-  item.status = current.next;
-  if (item.status === 'done' && item.progress < 100) item.progress = 100;
-  msCommit(p, 'Alterou status do marco');
+window.msSetStatus = function(projectId,phaseId,itemId,value) {
+ const p=msGetProject(projectId);if(!p||!canEdit(p)||!Object.hasOwn(MILESTONE_STATUS,value))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);if(!item)return;
+ const before=MILESTONE_STATUS[msStatusKey(item.status)].label;
+ if(msStatusKey(item.status)===value)return;
+ item.status=value;if(value==='done'&&item.progress<100)item.progress=100;
+ persist('Alterou status do marco no BI',p,before,MILESTONE_STATUS[value].label,'Status do marco · '+item.title);render();
+};
+window.msCycleStatus = function(projectId,phaseId,itemId) {
+ const p=msGetProject(projectId);if(!p)return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);
+ if(item)msSetStatus(projectId,phaseId,itemId,MILESTONE_STATUS[msStatusKey(item.status)].next);
 };
 
 window.msClickTimeline = function (ev, projectId, phaseId, itemId) {
@@ -924,46 +915,41 @@ window.msClickTimeline = function (ev, projectId, phaseId, itemId) {
   }
 };
 
-window.msOpenOwnerMenu = function (ev, projectId, phaseId, itemId) {
-  ev.stopPropagation();
-  const pop = document.getElementById('ms-owner-popover');
-  if (!pop) return;
-  const users = getSystemUsersList();
-  const rect = ev.currentTarget.getBoundingClientRect();
-
-  const opts = users
-    .map((u) => {
-      const uid = String(u.id || u.email);
-      const name = esc(u.name || u.full_name || u.email);
-      return `<div class="ms-pop-item" onclick="msSelectOwner('${projectId}', '${phaseId}', '${itemId}', '${esc(uid)}')">${name}</div>`;
-    })
-    .join('');
-
-  pop.innerHTML = `
-    <div class="ms-pop-item ms-pop-clear" onclick="msSelectOwner('${projectId}', '${phaseId}', '${itemId}', '')">Sem responsável</div>
-    ${opts || '<div class="ms-pop-empty" style="padding:8px 14px;font-size:12px;color:#676879;">Nenhum usuário encontrado</div>'}
-  `;
-  pop.style.display = 'block';
-  pop.style.top = rect.bottom + window.scrollY + 4 + 'px';
-  pop.style.left = rect.left + window.scrollX - 40 + 'px';
-
-  const closePop = () => {
-    pop.style.display = 'none';
-    document.removeEventListener('click', closePop);
-  };
-  setTimeout(() => document.addEventListener('click', closePop), 10);
+let msOwnerPicker=null, msOwnerSearchTimer=null;
+window.msOpenOwnerMenu = function(ev,projectId,phaseId,itemId) {
+ ev.stopPropagation();const p=msGetProject(projectId);if(!p||!canEdit(p))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);if(!item)return;
+ const user=getSystemUsersList().find(u=>String(u.id||u.email)===String(item.ownerId));
+ msOwnerPicker={projectId,phaseId,itemId,users:new Map(),offset:0,query:'',hasMore:false,request:0,selected:item.ownerId?{id:item.ownerId,name:item.ownerName||user?.name||user?.email||'Responsável cadastrado'}:null};
+ clearTimeout(msOwnerSearchTimer);
+ modal('Responsável pelo marco',`<form id="msOwnerForm" onsubmit="event.preventDefault();msSaveOwner()"><div class="field"><label for="msOwnerMode">Como deseja informar?</label><select id="msOwnerMode" onchange="msToggleOwnerMode()"><option value="user" ${item.ownerType!=='manual'?'selected':''}>Selecionar usuário cadastrado</option><option value="manual" ${item.ownerType==='manual'?'selected':''}>Digitar nome</option></select></div><div id="msOwnerRegistered"><div class="field"><label for="msOwnerSearch">Buscar usuário</label><input id="msOwnerSearch" type="search" maxlength="100" placeholder="Nome ou e-mail" oninput="msSearchOwners(this.value)"></div><p id="msOwnerSelection" aria-live="polite"></p><div id="msOwnerOptions" class="ms-owner-options"></div><button type="button" id="msOwnerMore" class="btn" hidden onclick="msLoadOwners(true)">Mostrar mais usuários</button></div><div id="msOwnerManual" class="field" hidden><label for="msOwnerName">Nome do responsável</label><input id="msOwnerName" maxlength="120" value="${esc(item.ownerName || '')}" placeholder="Digite o nome"></div><div class="actions"><button type="button" class="btn" onclick="msClearOwner()">Sem responsável</button><button type="submit" class="btn primary">Salvar responsável</button></div></form>`,btn('Cancelar','closeModal()','close'));
+ msRenderOwnerSelection();msToggleOwnerMode();
 };
-
-window.msSelectOwner = function (projectId, phaseId, itemId, ownerId) {
-  const p = msGetProject(projectId);
-  if (!p) return;
-  const phase = ensureProjectMilestones(p).find((x) => x.id === phaseId);
-  const item = phase?.items.find((x) => x.id === itemId);
-  if (item) {
-    item.ownerId = ownerId;
-    msCommit(p, 'Atribuiu responsável ao marco');
-  }
+window.msToggleOwnerMode=function(){const manual=document.getElementById('msOwnerMode')?.value==='manual';document.getElementById('msOwnerRegistered').hidden=manual;document.getElementById('msOwnerManual').hidden=!manual;if(!manual && msOwnerPicker && !msOwnerPicker.users.size)msLoadOwners();};
+function msRenderOwnerSelection(){const el=document.getElementById('msOwnerSelection');if(el)el.textContent=msOwnerPicker?.selected?'Selecionado: '+msOwnerPicker.selected.name:'Nenhum usuário selecionado.';}
+window.msSearchOwners=function(value){if(!msOwnerPicker)return;msOwnerPicker.query=value.trim();msOwnerPicker.request++;clearTimeout(msOwnerSearchTimer);const state=msOwnerPicker;msOwnerSearchTimer=setTimeout(()=>{if(msOwnerPicker===state)msLoadOwners();},220);};
+window.msLoadOwners=async function(more=false){
+ const state=msOwnerPicker,list=document.getElementById('msOwnerOptions');if(!state||!list)return;
+ const request=++state.request;if(!more){state.offset=0;state.users.clear();}list.textContent='Carregando usuários…';const moreButton=document.getElementById('msOwnerMore');moreButton.disabled=true;
+ try{if(!window.sb)throw new Error('Conexão ao servidor indisponível.');const result=await window.sb.rpc('secap_meeting_users',{p_search:state.query,p_offset:state.offset});
+ if(state!==msOwnerPicker || request!==state.request || !document.getElementById('msOwnerForm'))return;
+ if(result.error)throw result.error;if(!Array.isArray(result.data?.users))throw new Error('Lista de usuários inválida.');
+ for(const u of result.data.users)state.users.set(u.id,u);state.offset+=result.data.users.length;state.hasMore=!!result.data.hasMore;
+ list.innerHTML=[...state.users.values()].map((u,i)=>`<button type="button" class="ms-owner-option" onclick="msPickOwner(${i})"><strong>${esc(u.name||u.email)}</strong><small>${esc(u.email)}</small></button>`).join('')||'<p>Nenhum usuário encontrado.</p>';moreButton.hidden=!state.hasMore;moreButton.disabled=false;
+ }catch(error){if(state!==msOwnerPicker||request!==state.request)return;list.innerHTML='<p role="alert">Não foi possível carregar os usuários. Você pode digitar o nome ou tentar novamente.</p><button type="button" class="btn" onclick="msLoadOwners()">Tentar novamente</button>';moreButton.hidden=true;}
 };
+window.msPickOwner=function(index){const u=[...msOwnerPicker.users.values()][index];if(!u)return;msOwnerPicker.selected={id:u.id,name:u.name||u.email};msRenderOwnerSelection();};
+window.msSaveOwner=function(){
+ const state=msOwnerPicker;if(!state||!document.getElementById('msOwnerForm'))return;const p=msGetProject(state.projectId);if(!p||!canEdit(p))return;
+ const item=ensureProjectMilestones(p).find(ph=>ph.id===state.phaseId)?.items.find(it=>it.id===state.itemId);if(!item)return;
+ const manual=document.getElementById('msOwnerMode').value==='manual',name=manual?document.getElementById('msOwnerName').value.trim():state.selected?.name;
+ if(!name||name.length>120)return notify(manual?'Informe o nome do responsável.':'Selecione um usuário cadastrado.','error');
+ const before=item.ownerName||getSystemUsersList().find(u=>String(u.id||u.email)===String(item.ownerId))?.name||'—';
+ item.ownerId=manual?'':state.selected.id;item.ownerName=name;item.ownerType=manual?'manual':'user';
+ closeModal();persist('Alterou responsável do marco no BI',p,before,name,'Responsável do marco · '+item.title);render();
+};
+window.msClearOwner=function(){const state=msOwnerPicker;if(!state)return;const p=msGetProject(state.projectId);if(!p||!canEdit(p))return;const item=ensureProjectMilestones(p).find(ph=>ph.id===state.phaseId)?.items.find(it=>it.id===state.itemId);if(!item)return;const before=item.ownerName||'—';item.ownerId='';item.ownerName='';item.ownerType='';closeModal();persist('Removeu responsável do marco no BI',p,before,'—','Responsável do marco · '+item.title);render();};
+window.msSelectOwner=function(projectId,phaseId,itemId,ownerId){const p=msGetProject(projectId);if(!p||!canEdit(p))return;const item=ensureProjectMilestones(p).find(ph=>ph.id===phaseId)?.items.find(it=>it.id===itemId);const u=getSystemUsersList().find(u=>String(u.id||u.email)===String(ownerId));if(!item||(!u&&ownerId))return;item.ownerId=ownerId;item.ownerName=u?.name||u?.email||'';item.ownerType=ownerId?'user':'';msCommit(p,'Alterou responsável do marco no BI');};
 
 function biTerms(p, rs) {
   const terms = db.terms.filter((t) => t.project === p.id);

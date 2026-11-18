@@ -314,7 +314,6 @@
 .role-btn.is-demote:hover {
   background: #fdecea;
 }
-
 /* O flex-basis de 40px herdado achatava o avatar dentro da coluna. */
 .avatar-current-preview .profile-avatar.avatar-current-image {
   width: 80px !important; height: 80px !important;
