@@ -898,7 +898,13 @@ async function saveState(sb, owner, path, data) {
   return jsonResponse(200, { ok: true });
 }
 
+// Atualiza a tela de carregamento do login (loading-screen.js), quando visível.
+function loadingStep(message, value) {
+  if (window.SECAPLoading && window.SECAPLoading.active()) window.SECAPLoading.step(message, value);
+}
+
 async function bootCloud(config) {
+  loadingStep('Conectando ao servidor…', 25);
   const { createClient } =
     await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
   const sb = createClient(config.url, config.anonKey, {
@@ -912,6 +918,7 @@ async function bootCloud(config) {
   window.SECAP_CLOUD = true;
   installApi(sb);
 
+  loadingStep('Verificando seu acesso…', 35);
   const existing = await sb.auth.getUser();
   window.SECAP_ACTOR_ID = existing.data?.user?.id || ''; 
   let email = '';
@@ -949,6 +956,7 @@ async function bootCloud(config) {
   if (setup.error) throw new Error(setup.error.message);
   let state = null;
   if (active) {
+    loadingStep('Carregando seus projetos…', 50);
     const stored = await sb.rpc('secap_read_state');
     if (stored.error)
       throw new Error('Aplique supabase/security/project_access.sql. ' + stored.error.message);
@@ -966,6 +974,7 @@ async function bootCloud(config) {
       }
 
       // Carrega as obras da tabela dedicada no Supabase
+      loadingStep('Carregando as obras…', 65);
       const { data: obrasRows, error: obrasError } = await sb
         .from('obras')
         .select('*')
@@ -1018,6 +1027,11 @@ async function bootCloud(config) {
         'Falha ao salvar obra no backend'
       );
       if (!result.ok) warn(`A obra não foi salva no banco: ${result.error}`);
+      // Mantém a data da última alteração atualizada na tela (Visão geral) sem recarregar.
+      else {
+        if (record && typeof record === 'object') record.updated_at = new Date().toISOString();
+        window.dispatchEvent(new CustomEvent('secap:obra-saved', { detail: { projectId } }));
+      }
       return result;
     },
     batchSave: (projectId, records) =>
@@ -1064,8 +1078,11 @@ async function boot() {
         'Configuração do Supabase não encontrada em public/supabase-config.js. Inicie o Supabase CLI local (supabase start).'
       );
     }
+    loadingStep('Preparando painéis e indicadores…', 82);
     await loadScripts(APP_SCRIPTS);
+    if (window.SECAPLoading) window.SECAPLoading.finish();
   } catch (error) {
+    if (window.SECAPLoading) window.SECAPLoading.hide();
     showBootError(error.message || 'Não foi possível iniciar o SECAP.');
   }
 }

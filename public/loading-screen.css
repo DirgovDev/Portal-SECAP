@@ -1,0 +1,188 @@
+/* Tela de carregamento exibida ao entrar no portal (mesma identidade da tela de login). */
+.secap-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 24px 16px;
+  background: #032f43;
+  color: #fff;
+  font-family: Poppins, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  opacity: 1;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+.secap-loading[hidden] {
+  display: none;
+}
+.secap-loading.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Faixa institucional no topo */
+.secap-loading::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: linear-gradient(90deg, #003856 0 25%, #f37021 25% 50%, #268c48 50% 75%, #fff200 75% 100%);
+  z-index: 2;
+}
+
+/* Arcos laranja, como no painel da tela de login */
+.secap-loading .sl-arc {
+  position: absolute;
+  border: 20px solid #ff751b;
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px #032f43, 0 0 0 34px #ee6b193d, 0 0 0 52px #032f43, 0 0 0 68px #ee6b1924;
+  z-index: -1;
+  pointer-events: none;
+}
+.secap-loading .sl-arc.a1 {
+  width: 340px;
+  height: 340px;
+  right: -200px;
+  top: -190px;
+  animation: sl-drift 9s ease-in-out infinite alternate;
+}
+.secap-loading .sl-arc.a2 {
+  width: 430px;
+  height: 430px;
+  left: -280px;
+  bottom: -290px;
+  animation: sl-drift 11s ease-in-out infinite alternate-reverse;
+}
+
+.secap-loading .sl-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 22px;
+}
+.secap-loading .sl-logo {
+  width: 168px;
+  max-width: 60vw;
+  height: auto;
+}
+
+/* Anel giratório com as cores do sistema */
+.secap-loading .sl-ring {
+  position: relative;
+  width: 76px;
+  height: 76px;
+}
+.secap-loading .sl-ring::before,
+.secap-loading .sl-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.secap-loading .sl-ring::before {
+  border: 6px solid rgba(255, 255, 255, 0.12);
+}
+.secap-loading .sl-ring::after {
+  border: 6px solid transparent;
+  border-top-color: #f37021;
+  border-right-color: #fff200;
+  animation: sl-spin 0.95s linear infinite;
+}
+.secap-loading .sl-ring span {
+  position: absolute;
+  inset: 17px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+  border-bottom-color: #268c48;
+  border-left-color: #00a3d7;
+  animation: sl-spin 1.4s linear infinite reverse;
+}
+
+.secap-loading .sl-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffb27a;
+}
+.secap-loading .sl-title {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+}
+.secap-loading .sl-step {
+  min-height: 21px;
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* Barra de progresso nas quatro cores institucionais */
+.secap-loading .sl-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.secap-loading .sl-bar i {
+  display: block;
+  height: 100%;
+  width: 8%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #00a3d7, #268c48 35%, #fff200 65%, #f37021);
+  background-size: 420px 100%;
+  transition: width 0.6s ease;
+}
+
+.secap-loading .sl-foot {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@keyframes sl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sl-drift {
+  to {
+    transform: translate(-18px, 14px) scale(1.04);
+  }
+}
+
+@media (max-width: 700px) {
+  .secap-loading .sl-arc.a1 {
+    right: -260px;
+  }
+  .secap-loading .sl-arc.a2 {
+    left: -330px;
+    bottom: -360px;
+  }
+  .secap-loading .sl-title {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secap-loading,
+  .secap-loading .sl-bar i {
+    transition: none;
+  }
+  .secap-loading .sl-arc,
+  .secap-loading .sl-ring::after,
+  .secap-loading .sl-ring span {
+    animation-duration: 3s;
+  }
+  .secap-loading .sl-arc {
+    animation: none;
+  }
+}

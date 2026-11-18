@@ -29,6 +29,8 @@ function queueSave(state) {
 async function authenticate(form) {
   const msg = document.getElementById('authMessage');
   msg.textContent = 'Aguarde…';
+  const loading = window.SECAPLoading;
+  if (loading) loading.show('Verificando suas credenciais…');
   try {
     const r = await fetch(window.SECAP_SETUP ? '/api/setup' : '/api/login', {
       method: 'POST',
@@ -37,8 +39,11 @@ async function authenticate(form) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error);
+    // Mantém a tela de carregamento durante o recarregamento até o sistema abrir.
+    if (loading) loading.show('Acesso confirmado. Carregando o sistema…', true);
     location.reload();
   } catch (e) {
+    if (loading) loading.hide();
     msg.textContent = e.message;
   }
 }

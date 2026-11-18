@@ -189,6 +189,7 @@ async function buildAuditReport(say) {
     'Campo',
     'Registro Anterior',
     'Registro Atualizado',
+    'Justificativa',
     'Situação da recuperação',
   ];
   const body = rows.map((l) => {
@@ -204,6 +205,7 @@ async function buildAuditReport(say) {
       field,
       reportText(wholeRecord && l.before ? { 'Dados da obra': l.before } : l.before),
       reportText(wholeRecord && l.after ? { 'Dados da obra': l.after } : l.after),
+      typeof auditReason === 'function' ? auditReason(l) : '',
       l.recovered
         ? 'Recuperado'
         : l.recoveredFrom
@@ -223,7 +225,7 @@ async function buildAuditReport(say) {
     limit: REPORT_AUDIT_MAX_ROWS,
     baseName: `secap-auditoria-${reportStamp()}`,
     sheets: [
-      { name: 'Auditoria', headers, rows: body, widths: [20, 26, 24, 28, 30, 24, 40, 40, 26] },
+      { name: 'Auditoria', headers, rows: body, widths: [20, 26, 24, 28, 30, 24, 40, 40, 40, 26] },
       {
         name: 'Informações',
         headers: ['Item', 'Valor'],

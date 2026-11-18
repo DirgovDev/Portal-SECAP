@@ -221,7 +221,15 @@ const badge = (s) => {
 };
 const late = (r) => r.prazo && r.prazo < today() && r.status !== 'Concluído';
 
-function persist(action, where, before = '', after = '', field = '', serverRecorded = false, details = null) {
+function persist(
+  action,
+  where,
+  before = '',
+  after = '',
+  field = '',
+  serverRecorded = false,
+  details = null
+) {
   auditLoaded = false;
   if (action && !serverRecorded)
     db.logs.unshift({
@@ -303,7 +311,7 @@ function go(t, id = '') {
     return notify('Auditoria disponível apenas para administradores.', 'error');
   if (t === 'weekly' && typeof loadWeeklyLog === 'function') queueMicrotask(loadWeeklyLog);
   tableLimit = 50;
-  if(t==='calendar' && typeof calendarLoaded!=='undefined')calendarLoaded=false;
+  if (t === 'calendar' && typeof calendarLoaded !== 'undefined') calendarLoaded = false;
   tab = t;
   projectId = id;
   query = '';
@@ -346,13 +354,16 @@ function showLogin() {
 function googleLogin() {
   const el = document.getElementById('socialAuthMessage');
   if (window.SECAP_CLOUD && window.sb) {
+    if (window.SECAPLoading) window.SECAPLoading.show('Redirecionando para o Google…', true);
     window.sb.auth
       .signInWithOAuth({
         provider: 'google',
         options: { redirectTo: location.origin + location.pathname },
       })
       .then(({ error }) => {
-        if (error && el) el.textContent = error.message;
+        if (!error) return;
+        if (window.SECAPLoading) window.SECAPLoading.hide();
+        if (el) el.textContent = error.message;
       });
     return;
   }
@@ -410,7 +421,7 @@ function openAvatarModal() {
     .join('');
   modal(
     'Personalizar avatar',
-    `<p class="avatar-modal-help">Escolha um modelo pronto ou crie seu próprio personagem escolhendo o estilo e digitando uma palavra, nome ou apelido. <a href="https://www.dicebear.com/playground/" target="_blank" rel="noopener noreferrer">Abrir o Playground completo do DiceBear</a>.</p><div class="avatar-options">${choices}</div><section class="avatar-builder"><h3>Monte seu próprio avatar</h3><div class="avatar-builder-controls"><div class="field"><label for="customAvatarStyle">Estilo</label><select id="customAvatarStyle" onchange="updateCustomDicebearPreview()"><option value="adventurer-neutral">Adventurer</option><option value="avataaars">Avataaars</option><option value="big-ears">Big Ears</option><option value="croodles">Croodles</option><option value="lorelei">Lorelei</option><option value="personas">Personas</option></select></div><div class="field"><label for="customAvatarSeed">Nome ou palavra para gerar</label><input id="customAvatarSeed" type="text" value="Meu avatar" maxlength="50" placeholder="Digite seu nome" oninput="updateCustomDicebearPreview()"></div></div><div class="avatar-builder-preview"><img id="customDicebearPreview" src="https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=Meu%20avatar" alt="Prévia do avatar personalizado"><span>Prévia do seu avatar</span></div><button class="btn primary" type="button" onclick="applyCustomDicebearAvatar()">Usar meu avatar</button></section><form class="avatar-custom-form" onsubmit="event.preventDefault();saveCustomAvatar(this)"><div class="field"><label for="customAvatarUrl">Ou use o link de uma foto</label><input id="customAvatarUrl" name="avatarUrl" type="url" placeholder="https://exemplo.com/foto.jpg" autocomplete="url"></div><button class="btn secondary" type="submit">Usar foto</button><button class="btn secondary" type="button" onclick="saveAvatar('')">Remover foto</button></form>`
+    `<p class="avatar-modal-help">Escolha um modelo pronto ou crie seu próprio personagem escolhendo o estilo e digitando uma palavra, nome ou apelido. <a href="https://www.dicebear.com/playground/" target="_blank" rel="noopener noreferrer">Abrir o Playground completo do DiceBear</a>.</p><div class="avatar-options">${choices}</div><section class="avatar-builder"><h3>Monte seu próprio avatar</h3><div class="avatar-builder-controls"><div class="field"><label for="customAvatarStyle">Estilo</label><select id="customAvatarStyle" onchange="updateCustomDicebearPreview()"><option value="adventurer-neutral">Adventurer</option><option value="avataaars">Avataaars</option><option value="big-ears">Big Ears</option><option value="croodles">Croodles</option><option value="lorelei">Lorelei</option><option value="personas">Personas</option></select></div><div class="field"><label for="customAvatarSeed">Nome ou palavra para gerar</label><input id="customAvatarSeed" type="text" value="Meu avatar" maxlength="50" placeholder="Digite seu nome" oninput="updateCustomDicebearPreview()"></div></div><div class="avatar-builder-preview"><img id="customDicebearPreview" src="https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=Meu%20avatar" alt="Prévia do avatar personalizado"><span>Prévia do seu avatar</span></div><button class="btn primary" type="button" onclick="applyCustomDicebearAvatar()">Usar meu avatar</button></section><form class="avatar-custom-form" onsubmit="event.preventDefault();saveCustomAvatar(this)"><div class="field"><label for="customAvatarFile">Enviar uma foto do dispositivo</label><input id="customAvatarFile" name="avatarFile" type="file" accept="image/*" required><small class="avatar-upload-help">Selecione uma imagem para usar como foto do perfil.</small></div><button class="btn secondary" type="submit">Enviar foto</button><button class="btn secondary" type="button" onclick="saveAvatar('')">Remover foto</button></form>`
   );
   updateCustomDicebearPreview();
 }
@@ -443,20 +454,51 @@ function saveAvatar(url) {
   notify('Foto de perfil atualizada.');
 }
 
-function saveCustomAvatar(form) {
-  const value = form.avatarUrl.value.trim();
-  if (!value) {
-    notify('Informe o link da foto.');
+async function saveCustomAvatar(form) {
+  const file = form.avatarFile?.files?.[0];
+  if (!file) {
+    notify('Selecione uma foto para continuar.');
     return;
   }
+  if (!file.type.startsWith('image/')) {
+    notify('Selecione um arquivo de imagem válido.');
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    notify('A foto deve ter no máximo 12 MB.');
+    return;
+  }
+
   try {
-    const parsed = new URL(value);
-    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('URL inválida');
-  } catch {
-    notify('Informe um link válido iniciado por https:// ou http://.');
-    return;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Não foi possível ler a foto.'));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error('Não foi possível abrir essa imagem.'));
+        image.onload = () => {
+          const maxDimension = 512;
+          const ratio = Math.min(
+            1,
+            maxDimension / Math.max(image.naturalWidth, image.naturalHeight)
+          );
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+          const context = canvas.getContext('2d');
+          if (!context) return reject(new Error('Não foi possível processar a foto.'));
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const webp = canvas.toDataURL('image/webp', 0.82);
+          resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.82));
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+    saveAvatar(dataUrl);
+  } catch (error) {
+    notify(error.message || 'Não foi possível carregar a foto.');
   }
-  saveAvatar(value);
 }
 
 function render() {
@@ -1076,33 +1118,222 @@ function renderProjectsBarChart(projects) {
     }
   });
 }
-// Responsáveis do projeto: o responsável da pasta + os responsáveis informados nas obras.
+// Responsáveis do projeto: contas de usuários escolhidas pelo botão "+".
+// Fica em p.responsibles = [{ id, name, email }]. Os nomes digitados nas obras
+// (campo "Responsável") e o responsável antigo da pasta não aparecem mais aqui.
+function projectResponsibleList(p) {
+  return Array.isArray(p?.responsibles)
+    ? p.responsibles.filter((u) => u && (u.email || u.id))
+    : [];
+}
 function projectResponsibles(p) {
-  const seen = new Set();
-  const names = [];
-  [p.owner, ...(p.records || []).map((r) => r.responsavel)].forEach((v) => {
-    const name = String(v || '').trim();
-    const key = name.toLowerCase();
-    if (name && !seen.has(key)) {
-      seen.add(key);
-      names.push(name);
-    }
-  });
-  if (!names.length)
-    return `<div class="presp"><small>Responsáveis</small><span class="presp-empty">Sem responsável</span></div>`;
+  const list = projectResponsibleList(p);
+  // Somente administradores definem os responsáveis do projeto.
+  const editable = isSysAdmin();
   const MAX = 3;
-  const chips = names
+  const chips = list
     .slice(0, MAX)
-    .map(
-      (n) =>
-        `<span class="presp-chip" title="${esc(n)}"><i aria-hidden="true">${esc(initials(n))}</i>${esc(n)}</span>`
-    )
+    .map((u) => {
+      const name = u.name || u.email;
+      return `<span class="presp-chip" title="${esc(name)}${u.email && u.email !== name ? ' · ' + esc(u.email) : ''}"><i aria-hidden="true">${esc(initials(name))}</i>${esc(name)}</span>`;
+    })
     .join('');
   const more =
-    names.length > MAX
-      ? `<span class="presp-more" title="${esc(names.slice(MAX).join(', '))}">+${names.length - MAX}</span>`
+    list.length > MAX
+      ? `<span class="presp-more" title="${esc(
+          list
+            .slice(MAX)
+            .map((u) => u.name || u.email)
+            .join(', ')
+        )}">+${list.length - MAX}</span>`
       : '';
-  return `<div class="presp"><small>Responsáveis</small><div class="presp-list">${chips}${more}</div></div>`;
+  const add = editable
+    ? `<button type="button" class="presp-add" title="Adicionar responsáveis" aria-label="Adicionar responsáveis ao projeto ${esc(p.name)}" onclick="event.stopPropagation();openProjectResponsibles('${esc(p.id)}')" onkeydown="event.stopPropagation()">+</button>`
+    : '';
+  const empty = list.length ? '' : '<span class="presp-empty">Sem responsável</span>';
+  return `<div class="presp"><small>Responsáveis</small><div class="presp-list">${chips}${more}${empty}${add}</div></div>`;
+}
+
+let responsiblesPicker = null;
+let responsiblesPickerTimer = null;
+
+function openProjectResponsibles(pid) {
+  const p = db.projects.find((x) => String(x.id) === String(pid));
+  if (!p || !isSysAdmin()) return;
+  responsiblesPicker = {
+    pid: String(pid),
+    selected: new Map(projectResponsibleList(p).map((u) => [String(u.email || u.id).toLowerCase(), u])),
+    users: [],
+    query: '',
+    offset: 0,
+    hasMore: false,
+    loading: false,
+    error: '',
+    request: 0,
+  };
+  modal(
+    'Responsáveis do projeto',
+    `<div class="resp-picker">
+       <p class="subtitle">${esc(p.name)} · escolha as contas de usuários responsáveis por este projeto.</p>
+       <div class="resp-selected" id="respSelected" aria-live="polite"></div>
+       <div class="field">
+         <label for="respSearch">Buscar usuário</label>
+         <input id="respSearch" type="search" maxlength="100" placeholder="Nome ou e-mail" autocomplete="off" oninput="searchProjectResponsibles(this.value)">
+       </div>
+       <div class="resp-options" id="respOptions" role="group" aria-label="Contas de usuários"></div>
+     </div>`,
+    btn('Cancelar', 'closeModal()', 'close') +
+      btn('Salvar responsáveis', 'saveProjectResponsibles()', 'check', 'primary')
+  );
+  renderProjectResponsibles();
+  loadProjectResponsibles(false);
+  setTimeout(() => document.getElementById('respSearch')?.focus(), 50);
+}
+
+function responsibleKey(u) {
+  return String(u.email || u.id || '').toLowerCase();
+}
+
+function renderProjectResponsibles() {
+  const state = responsiblesPicker;
+  const sel = document.getElementById('respSelected');
+  const opts = document.getElementById('respOptions');
+  if (!state || !sel || !opts) return;
+  const chosen = [...state.selected.values()];
+  sel.innerHTML = chosen.length
+    ? chosen
+        .map(
+          (u, i) =>
+            `<span class="presp-chip"><i aria-hidden="true">${esc(initials(u.name || u.email))}</i>${esc(u.name || u.email)}<button type="button" class="resp-remove" title="Remover" aria-label="Remover ${esc(u.name || u.email)}" onclick="removeProjectResponsible(${i})">${icon('close')}</button></span>`
+        )
+        .join('')
+    : '<span class="presp-empty">Nenhum responsável selecionado.</span>';
+  if (state.error) {
+    opts.innerHTML = `<p class="resp-error" role="alert">Não foi possível carregar os usuários. ${esc(state.error)}</p><button class="btn" type="button" onclick="loadProjectResponsibles(false)">Tentar novamente</button>`;
+    return;
+  }
+  const rows = state.users
+    .map((u) => {
+      const key = responsibleKey(u);
+      const on = state.selected.has(key);
+      return `<label class="resp-option${on ? ' is-on' : ''}"><input type="checkbox" ${on ? 'checked' : ''} onchange="toggleProjectResponsible('${esc(String(u.id))}', this.checked)"><span class="presp-chip-ico" aria-hidden="true">${esc(initials(u.name || u.email))}</span><span><b>${esc(u.name || u.email)}</b><small>${esc(u.email || '')}</small></span></label>`;
+    })
+    .join('');
+  opts.innerHTML =
+    (rows ||
+      (state.loading ? '' : '<p class="presp-empty">Nenhum usuário encontrado.</p>')) +
+    (state.loading ? '<p class="resp-loading" role="status">Carregando usuários…</p>' : '') +
+    (state.hasMore && !state.loading
+      ? `<button class="textbtn" type="button" onclick="loadProjectResponsibles(true)">Carregar mais usuários</button>`
+      : '');
+}
+
+function toggleProjectResponsible(id, on) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  const u = state.users.find((x) => String(x.id) === String(id));
+  if (!u) return;
+  if (on) state.selected.set(responsibleKey(u), { id: u.id, name: u.name || u.email, email: u.email || '' });
+  else state.selected.delete(responsibleKey(u));
+  renderProjectResponsibles();
+}
+
+function removeProjectResponsible(index) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  const key = [...state.selected.keys()][index];
+  state.selected.delete(key);
+  renderProjectResponsibles();
+}
+
+function searchProjectResponsibles(value) {
+  const state = responsiblesPicker;
+  if (!state) return;
+  state.query = String(value || '').trim();
+  state.request++;
+  clearTimeout(responsiblesPickerTimer);
+  responsiblesPickerTimer = setTimeout(() => {
+    if (responsiblesPicker === state) loadProjectResponsibles(false);
+  }, 220);
+}
+
+// Mesma lista de contas usada na agenda (participantes de reunião).
+async function loadProjectResponsibles(more = false) {
+  const state = responsiblesPicker;
+  if (!state || !document.getElementById('respOptions')) return;
+  const request = ++state.request;
+  if (!more) {
+    state.offset = 0;
+    state.users = [];
+  }
+  state.loading = true;
+  state.error = '';
+  renderProjectResponsibles();
+  try {
+    if (!window.sb) throw new Error('Conexão ao servidor indisponível.');
+    let result = await window.sb.rpc('secap_meeting_users', {
+      p_search: state.query,
+      p_offset: state.offset,
+    });
+    if (result.error && (result.error.code === 'PGRST202' || /schema cache/.test(result.error.message || ''))) {
+      if (!isSysAdmin())
+        throw new Error('A lista de usuários ainda não foi instalada neste banco. Solicite ao administrador aplicar supabase/security/meeting_participants.sql.');
+      const term = state.query.replace(/[%,().]/g, '');
+      let directory = window.sb
+        .from('profiles')
+        .select('id,name,email')
+        .in('role', ['administrador', 'usuario'])
+        .order('name')
+        .order('id');
+      if (term) directory = directory.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
+      const fallback = await directory.range(state.offset, state.offset + 50);
+      if (fallback.error) throw fallback.error;
+      result = { data: { users: (fallback.data || []).slice(0, 50), hasMore: (fallback.data || []).length > 50 } };
+    }
+    if (state !== responsiblesPicker || request !== state.request) return;
+    if (result.error) throw result.error;
+    if (!Array.isArray(result.data?.users)) throw new Error('Lista de usuários inválida.');
+    for (const u of result.data.users) {
+      if (!u || !u.email) continue;
+      state.users.push({ id: u.id, name: u.name || u.email, email: u.email });
+    }
+    state.offset += result.data.users.length;
+    state.hasMore = !!result.data.hasMore;
+  } catch (error) {
+    if (state !== responsiblesPicker || request !== state.request) return;
+    state.error = String(error?.message || error);
+    state.hasMore = false;
+  } finally {
+    if (state === responsiblesPicker && request === state.request) state.loading = false;
+  }
+  renderProjectResponsibles();
+}
+
+function saveProjectResponsibles() {
+  const state = responsiblesPicker;
+  const p = state && db.projects.find((x) => String(x.id) === state.pid);
+  if (!p || !isSysAdmin()) return;
+  const before = projectResponsibleList(p)
+    .map((u) => u.name || u.email)
+    .join(', ');
+  p.responsibles = [...state.selected.values()].map((u) => ({
+    id: u.id,
+    name: u.name || u.email,
+    email: u.email || '',
+  }));
+  const after = p.responsibles.map((u) => u.name || u.email).join(', ');
+  responsiblesPicker = null;
+  closeModal();
+  if (before !== after) {
+    persist('Atualizou responsáveis do projeto', p, before || 'Nenhum', after || 'Nenhum', 'Responsáveis');
+    notify(
+      p.responsibles.length
+        ? `${p.responsibles.length} responsável(is) definido(s) para ${p.name}.`
+        : `Responsáveis removidos de ${p.name}.`,
+      'success'
+    );
+  }
+  render();
 }
 let draggedProjectId = '';
 
@@ -1702,7 +1933,7 @@ function projectView() {
       esc(p.description),
       btn('Exportar', `openExport('${p.id}')`, 'download') +
         (isSysAdmin() && canEdit(p) ? btn('Importar', `openImport('${p.id}')`, 'upload') : '') +
-        (isSysAdmin() ? btn('Personalizar campos', `editFields('${p.id}')`, 'edit') : '') +
+        btn('Configurar seções e campos', `editFields('${p.id}')`, 'edit') +
         (canEdit(p) ? btn('Nova obra', `editRecord('${p.id}')`, 'plus', 'primary') : '')
     ) +
     `<div class="stats">${stat(
@@ -2233,7 +2464,8 @@ let auditLoaded = false,
   auditLoading = false,
   auditRows = [],
   auditError = '';
-let auditScope = 'projects', auditDetailRecoveryRows = [];
+let auditScope = 'projects',
+  auditDetailRecoveryRows = [];
 let auditView = 'recent',
   auditDateMode = 'all',
   auditStart = '',
@@ -2340,8 +2572,8 @@ function auditRangeLabel(start, end) {
   return `${auditShortDate(start, differentYear)} – ${auditShortDate(end, differentYear)}`;
 }
 function setAuditScope(scope) {
-  if(!isSysAdmin())return;
-  auditScope=scope==='bi'?'bi':'projects';
+  if (!isSysAdmin()) return;
+  auditScope = scope === 'bi' ? 'bi' : 'projects';
   setAuditView('recent');
 }
 function setAuditView(view) {
@@ -2479,7 +2711,7 @@ document.addEventListener('keydown', (e) => {
 
 function requestAuditRecovery(eventId) {
   if (!isSysAdmin() || auditRecovering) return;
-  const l = [...auditRows,...auditDetailRecoveryRows].find((l) => l.eventId === eventId);
+  const l = [...auditRows, ...auditDetailRecoveryRows].find((l) => l.eventId === eventId);
   if (!l?.recoverable || l.recovered)
     return notify('Esta alteração não pode ser recuperada automaticamente.', 'error');
   modal(
@@ -2536,52 +2768,141 @@ async function confirmAuditRecovery(eventId, button) {
     auditRecovering = false;
   }
 }
-function isAuditBatch(entry) { return /^Edição em lote de obras/.test(entry.action || ''); }
+function isAuditBatch(entry) {
+  return /^Edição em lote de obras/.test(entry.action || '');
+}
 function auditBILabel(entry) {
   if (entry.source === 'bi' || /\bBI\b/i.test(entry.action || '')) return 'Sim';
   if (entry.source === 'projects' || entry.eventId || isAuditBatch(entry)) return 'Não';
   return '—';
 }
+// Justificativas por obra chegam como "[Obra] texto | [Obra 2] texto".
+function auditObraReasons(reason) {
+  const text = String(reason || '');
+  if (!text.startsWith('[')) return null;
+  const map = new Map();
+  for (const m of text.matchAll(/\[([^\]]+)\] ([\s\S]*?)(?= \| \[|$)/g)) map.set(m[1], m[2]);
+  return map.size ? map : null;
+}
 function auditReason(entry) {
-  if (entry.details?.reason) return entry.details.reason;
-  if (!isAuditBatch(entry)) return '—';
-  return String(entry.after || '').match(/Justificativa: ([\s\S]*?)(?: \| Alterações:|$)/)?.[1] || '—';
+  const reason =
+    entry.details?.reason ||
+    (isAuditBatch(entry)
+      ? String(entry.after || '').match(/Justificativa: ([\s\S]*?)(?: \| Alterações:|$)/)?.[1]
+      : '');
+  if (!reason) return '—';
+  // Registro de uma obra só: mostra apenas a justificativa daquela obra.
+  const byObra = !isAuditBatch(entry) && entry.recordName ? auditObraReasons(reason) : null;
+  return byObra ? byObra.get(entry.recordName) || 'Não informada' : reason;
+}
+// Revisão das obras (Alteração feita / Sem alteração) registrada ao concluir a edição.
+function auditReviewHtml(entry) {
+  const review = Array.isArray(entry.details?.review) ? entry.details.review : null;
+  const checklist = entry.details?.checklist || [];
+  if (!review) {
+    if (!checklist.length) return '';
+    const isReview = checklist.some((c) => /^(Alteração feita|Sem alteração):/.test(c));
+    return `<p><strong>${isReview ? 'Revisão das obras' : 'Tipo de mudança'}:</strong> ${esc(checklist.join('; '))}</p>`;
+  }
+  const changed = review.filter((r) => r.status === 'alterada').length;
+  return `<h4>Revisão das obras</h4>
+    <div class="obra-review-legend" aria-label="Legenda da revisão das obras">
+      <span class="orl-item is-changed"><i aria-hidden="true">✓</i><span><strong>Alteração feita</strong> · ${changed} obra(s)</span></span>
+      <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · ${review.length - changed} obra(s)</span></span>
+      <span class="orl-item is-note">${icon('note')}<span><strong>Justificativa</strong> · opcional, por obra</span></span>
+    </div>
+    <table class="audit-details-table audit-review-table"><thead><tr><th>Obra</th><th>Situação</th><th>Justificativa</th></tr></thead><tbody>${review
+      .map((r) => {
+        const on = r.status === 'alterada';
+        return `<tr><td>${esc(r.recordName || r.recordId || '—')}</td><td><span class="audit-review-status ${on ? 'is-changed' : 'is-unchanged'}"><i aria-hidden="true">✓</i>${on ? 'Alteração feita' : 'Sem alteração'}</span></td><td>${esc(r.justification || 'Não informada')}</td></tr>`;
+      })
+      .join('')}</tbody></table>`;
 }
 function auditDetailChanges(entry) {
   if (Array.isArray(entry.details?.changes)) return entry.details.changes;
-  if (!isAuditBatch(entry)) return [{recordName:entry.recordName || '',action:entry.action,field:entry.field || '—',before:entry.before,after:entry.after}];
+  if (!isAuditBatch(entry))
+    return [
+      {
+        recordName: entry.recordName || '',
+        action: entry.action,
+        field: entry.field || '—',
+        before: entry.before,
+        after: entry.after,
+      },
+    ];
   // Compatibilidade com os resumos antigos; preserva o texto quando não há estrutura segura.
-  const parse = text => {
-    const result=[];
+  const parse = (text) => {
+    const result = [];
     for (const part of String(text || '').split(' | ')) {
-      const match=part.match(/^\[([^\]]+)\] ([\s\S]*)$/);if(!match)continue;
-      for(const field of match[2].split('; ')) {const at=field.indexOf(': ');if(at>=0)result.push({recordName:match[1],field:field.slice(0,at),value:field.slice(at+2)});}
-    }return result;
+      const match = part.match(/^\[([^\]]+)\] ([\s\S]*)$/);
+      if (!match) continue;
+      for (const field of match[2].split('; ')) {
+        const at = field.indexOf(': ');
+        if (at >= 0)
+          result.push({
+            recordName: match[1],
+            field: field.slice(0, at),
+            value: field.slice(at + 2),
+          });
+      }
+    }
+    return result;
   };
-  const before=parse(entry.before),after=parse(String(entry.after || '').split(' | Alterações: ').slice(1).join(' | Alterações: '));
-  if(before.length && before.length===after.length && before.every((v,i)=>v.recordName===after[i].recordName&&v.field===after[i].field))return before.map((v,i)=>({recordName:v.recordName,action:'Alterou campo',field:v.field,before:v.value,after:after[i].value}));
+  const before = parse(entry.before),
+    after = parse(
+      String(entry.after || '')
+        .split(' | Alterações: ')
+        .slice(1)
+        .join(' | Alterações: ')
+    );
+  if (
+    before.length &&
+    before.length === after.length &&
+    before.every((v, i) => v.recordName === after[i].recordName && v.field === after[i].field)
+  )
+    return before.map((v, i) => ({
+      recordName: v.recordName,
+      action: 'Alterou campo',
+      field: v.field,
+      before: v.value,
+      after: after[i].value,
+    }));
   return [];
 }
 async function openAuditDetails(index) {
-  if(!isSysAdmin())return;
-  const entry=auditRows[index];if(!entry)return;
-  const changes=auditDetailChanges(entry);
-  auditDetailRecoveryRows=[];
-  const detailToken=String(Date.now())+Math.random();
-  modal('Detalhes da alteração',`<div class="audit-detail-content" data-audit-detail="${detailToken}"><p><strong>Data e hora:</strong> ${esc(new Date(entry.at).toLocaleString('pt-BR'))}</p><p><strong>Ação:</strong> ${esc(entry.action || '—')}</p><p><strong>Responsável:</strong> ${esc(entry.who || 'Não informado')}</p><p><strong>Motivo:</strong> ${esc(auditReason(entry))}</p>${entry.details?.checklist?.length?`<p><strong>Tipo de mudança:</strong> ${esc(entry.details.checklist.join('; '))}</p>`:''}${changes.length?`<table class="audit-details-table"><thead><tr><th>Obra</th><th>Ação</th><th>Campo</th><th>Registro anterior</th><th>Registro atualizado</th><th>Recuperação</th></tr></thead><tbody>${changes.map((c,changeIndex)=>`<tr><td>${esc(c.recordName || entry.recordName || '—')}</td><td>${esc(c.action || 'Alterou campo')}</td><td>${esc(c.field || '—')}</td><td>${esc(auditValue(c.before))}</td><td>${esc(auditValue(c.after))}</td><td data-detail-recovery="${changeIndex}">${entry.eventId && entry.recoverable && entry.fieldId && !entry.recovered ? btn('Recuperar',`requestAuditRecovery('${esc(entry.eventId)}')`,'history') : entry.recovered ? 'Recuperado' : isAuditBatch(entry) && entry.details?.changes ? 'Consultando…' : 'Indisponível'}</td></tr>`).join('')}</tbody></table>`:`<p>Registro antigo sem detalhamento estruturado. Conteúdo original preservado:</p><h4>Registro anterior</h4><pre>${esc(auditValue(entry.before))}</pre><h4>Registro atualizado</h4><pre>${esc(auditValue(entry.after))}</pre>`}</div>`,btn('Fechar','closeModal()','close'));
-  if(isAuditBatch(entry) && entry.details?.changes && window.sb) {
+  if (!isSysAdmin()) return;
+  const entry = auditRows[index];
+  if (!entry) return;
+  const changes = auditDetailChanges(entry);
+  auditDetailRecoveryRows = [];
+  const detailToken = String(Date.now()) + Math.random();
+  modal(
+    'Detalhes da alteração',
+    `<div class="audit-detail-content" data-audit-detail="${detailToken}"><p><strong>Data e hora:</strong> ${esc(new Date(entry.at).toLocaleString('pt-BR'))}</p><p><strong>Ação:</strong> ${esc(entry.action || '—')}</p><p><strong>Responsável:</strong> ${esc(entry.who || 'Não informado')}</p>${Array.isArray(entry.details?.review) ? '' : `<p><strong>Justificativa:</strong> ${esc(auditReason(entry))}</p>`}${auditReviewHtml(entry)}${changes.length ? `<table class="audit-details-table"><thead><tr><th>Obra</th><th>Ação</th><th>Campo</th><th>Registro anterior</th><th>Registro atualizado</th><th>Recuperação</th></tr></thead><tbody>${changes.map((c, changeIndex) => `<tr><td>${esc(c.recordName || entry.recordName || '—')}</td><td>${esc(c.action || 'Alterou campo')}</td><td>${esc(c.field || '—')}</td><td>${esc(auditValue(c.before))}</td><td>${esc(auditValue(c.after))}</td><td data-detail-recovery="${changeIndex}">${entry.eventId && entry.recoverable && entry.fieldId && !entry.recovered ? btn('Recuperar', `requestAuditRecovery('${esc(entry.eventId)}')`, 'history') : entry.recovered ? 'Recuperado' : isAuditBatch(entry) && entry.details?.changes ? 'Consultando…' : 'Indisponível'}</td></tr>`).join('')}</tbody></table>` : `<p>Registro antigo sem detalhamento estruturado. Conteúdo original preservado:</p><h4>Registro anterior</h4><pre>${esc(auditValue(entry.before))}</pre><h4>Registro atualizado</h4><pre>${esc(auditValue(entry.after))}</pre>`}</div>`,
+    btn('Fechar', 'closeModal()', 'close')
+  );
+  if (isAuditBatch(entry) && entry.details?.changes && window.sb) {
     try {
-      const response=await window.sb.rpc('secap_audit_detail_events',{p_log_id:entry.id});
-      if(document.querySelector('[data-audit-detail]')?.dataset.auditDetail!==detailToken)return;
-      if(response.error)throw response.error;
-      auditDetailRecoveryRows=Array.isArray(response.data)?response.data:[];
-      for(let i=0;i<changes.length;i++){
-        const cell=document.querySelector(`[data-detail-recovery="${i}"]`), event=auditDetailRecoveryRows.find(e=>e.changeIndex===i);
-        if(cell)cell.innerHTML=event?.recoverable?btn('Recuperar',`requestAuditRecovery('${esc(event.eventId)}')`,'history'):'Indisponível';
+      const response = await window.sb.rpc('secap_audit_detail_events', { p_log_id: entry.id });
+      if (document.querySelector('[data-audit-detail]')?.dataset.auditDetail !== detailToken)
+        return;
+      if (response.error) throw response.error;
+      auditDetailRecoveryRows = Array.isArray(response.data) ? response.data : [];
+      for (let i = 0; i < changes.length; i++) {
+        const cell = document.querySelector(`[data-detail-recovery="${i}"]`),
+          event = auditDetailRecoveryRows.find((e) => e.changeIndex === i);
+        if (cell)
+          cell.innerHTML = event?.recoverable
+            ? btn('Recuperar', `requestAuditRecovery('${esc(event.eventId)}')`, 'history')
+            : 'Indisponível';
       }
-    } catch(error) {
-      if(document.querySelector('[data-audit-detail]')?.dataset.auditDetail!==detailToken)return;
-      document.querySelectorAll('[data-detail-recovery]').forEach(cell=>{cell.textContent='Indisponível';cell.title='Não foi possível consultar um registro seguro para recuperação.';});
+    } catch (error) {
+      if (document.querySelector('[data-audit-detail]')?.dataset.auditDetail !== detailToken)
+        return;
+      document.querySelectorAll('[data-detail-recovery]').forEach((cell) => {
+        cell.textContent = 'Indisponível';
+        cell.title = 'Não foi possível consultar um registro seguro para recuperação.';
+      });
     }
   }
 }
@@ -2601,7 +2922,11 @@ function history() {
         `setAuditView('${archived ? 'recent' : 'archive'}')`,
         'folder'
       ) +
-        btn(auditScope==='bi'?'Auditoria de obras':'Histórico de BI', `setAuditScope('${auditScope==='bi'?'projects':'bi'}')`, 'chart') +
+        btn(
+          auditScope === 'bi' ? 'Auditoria de obras' : 'Histórico de BI',
+          `setAuditScope('${auditScope === 'bi' ? 'projects' : 'bi'}')`,
+          'chart'
+        ) +
         btn('Baixar relatório', "openReportExport('audit')", 'download') +
         btn('Atualizar', 'refreshAuditLogs()', 'history')
     ) +
@@ -2617,13 +2942,15 @@ function history() {
     ${auditError ? `<div class="banner" role="alert">${esc(auditError)}</div>` : ''}
     ${auditLoading || !auditLoaded ? '<p role="status">Consultando registros…</p>' : ''}
     <section class="panel audit-panel"><div class="tablewrap"><table aria-label="Registros de alteração"><thead><tr>
-    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Motivo</th><th>Recuperação</th>
+    <th>Data e Hora</th><th>Usuário/Responsável</th><th>Ação</th><th>Qual Projeto</th><th>Campo</th><th>Registro Anterior</th><th>Registro Atualizado</th><th>Justificativa</th><th>Recuperação</th>
     </tr></thead><tbody>${logs
       .map((l, auditIndex) => {
         const project = db.projects.find((p) => p.id === l.project);
-        const single = isAuditBatch(l) && auditDetailChanges(l).length===1 ? auditDetailChanges(l)[0] : null;
+        const single =
+          isAuditBatch(l) && auditDetailChanges(l).length === 1 ? auditDetailChanges(l)[0] : null;
         const multiple = isAuditBatch(l) && !single;
-        const field = single?.field || l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
+        const field =
+          single?.field || l.field || (l.action?.startsWith('Alterou ') ? l.action.slice(8) : '—');
         const projectName =
           l.projectName || project?.name || (l.project ? l.where || l.project : '—');
         const at = new Date(l.at);

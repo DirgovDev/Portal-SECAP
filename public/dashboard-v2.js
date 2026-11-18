@@ -26,6 +26,8 @@
     var dl = deadline ? daysLeft(deadline) : null;
     var late = (!!deadline&&dl<0||status==='Atrasado')&&!finished&&!cancelled;
     var owner=String(val(r,p,'owner')||'').trim();
+    var lastEdit=editedAt(r);
+    var idleDays=lastEdit?Math.floor((Date.now()-lastEdit.getTime())/86400000):null;
     if(/^(?:não informado|nao informado|a definir|não definido|nao definido|n\/a|-)$/i.test(owner))owner='';
     return {
       x: x,
@@ -43,8 +45,17 @@
       progress: physicalProgress(val(r,p,'progress')),
       agency: String(val(r, p, 'agency') || '').trim(),
       title: recordTitle(r, p),
+      lastEdit: lastEdit,
+      idleDays: idleDays,
+      // Obra sem nenhuma alteração há mais de 10 dias (concluídas e canceladas não entram).
+      idle: idleDays!==null&&idleDays>IDLE_DAYS&&!finished&&!cancelled,
     };
   }
+  var IDLE_DAYS=10;
+  // Data da última alteração da obra (gravada pelo banco a cada salvamento).
+  function editedAt(r){var t=r&&(r.updated_at||r.created_at);var d=t?new Date(t):null;return d&&!isNaN(d.getTime())?d:null}
+  function dateTime(d){return d?d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}
+  function idleText(n){return 'Sem alteração há '+n+(n===1?' dia':' dias')}
   function reasons(i) {
     var a = [];
     if (i.late)
@@ -103,10 +114,10 @@
       : 0;
     var attention = all
       .filter(function (i) {
-        return score(i) > 0;
+        return i.idle;
       })
       .sort(function (a, b) {
-        return score(b) - score(a);
+        return b.idleDays - a.idleDays || score(b) - score(a);
       });
     var pct = function (n) {
       return all.length ? Math.round((n / all.length) * 100) + '% do total' : '—';
@@ -192,12 +203,12 @@
               esc(i.x.p.name || '') +
               (i.agency ? ' · ' + esc(i.agency) : '') +
               '</small><span class="att-tags">' +
-              reasons(i)
+              [['stale',idleText(i.idleDays)]].concat(reasons(i).filter(function(t){return t[0]!=='stale'}))
                 .map(function (t) {
                   return '<span class="att-tag ' + t[0] + '">' + esc(t[1]) + '</span>';
                 })
                 .join('') +
-              '</span><small class="att-next-action">'+esc(i.x.r.proxima||'Definir a próxima providência')+' · '+esc(val(i.x.r,i.x.p,'owner')||'Responsável opcional')+' · '+esc((i.x.r.prazo_acao?'Prazo da ação: ':'Entrega prevista: ')+date(i.x.r.prazo_acao||val(i.x.r,i.x.p,'deadline')))+'</small></div><button type="button" class="btn" onclick="editRecord(\'' +
+              '</span><small class="att-next-action">Última alteração: '+esc(dateTime(i.lastEdit))+' · '+esc(i.x.r.proxima||'Definir a próxima providência')+'</small></div><button type="button" class="btn" onclick="editRecord(\'' +
               esc(i.x.p.id) +
               "','" +
               esc(i.x.r.id) +
@@ -209,10 +220,10 @@
           .join('')
       : '<li class="att-empty">' +
         icon('check') +
-        (all.length?'<b>Sem alerta de prazo ou situação</b><small>Confira se os prazos e responsáveis estão atualizados.</small></li>':'<b>Ainda não há obras</b><small>Cadastre ou importe os registros para iniciar a análise.</small></li>');
+        (all.length?'<b>Nenhuma obra parada</b><small>Todas as obras em acompanhamento foram alteradas nos últimos '+IDLE_DAYS+' dias.</small></li>':'<b>Ainda não há obras</b><small>Cadastre ou importe os registros para iniciar a análise.</small></li>');
 
     setTimeout(function () {
-      if(generation===renderGeneration&&tab==='dashboard')drawCharts(projects,all);
+      if(generation===renderGeneration&&tab==='dashboard'){drawCharts(projects,all);if(isSysAdmin())loadRecentEditors(generation);}
     }, 80);
 
     var d = new Date().toLocaleDateString('pt-BR', {
@@ -226,9 +237,9 @@
         'Visão geral',
         attention.length
           ? attention.length +
-              (attention.length === 1 ? ' obra pede' : ' obras pedem') +
-              ' atenção agora.'
-          : all.length?'Sem alerta de prazo ou situação nos registros informados.':'Cadastre projetos e obras para começar o acompanhamento.'
+              (attention.length === 1 ? ' obra está' : ' obras estão') +
+              ' sem alteração há mais de '+IDLE_DAYS+' dias.'
+          : all.length?'Todas as obras em acompanhamento foram alteradas nos últimos '+IDLE_DAYS+' dias.':'Cadastre projetos e obras para começar o acompanhamento.'
       ) +
       
       '<section class="dkpis" aria-label="Indicadores">' +
@@ -237,8 +248,8 @@
       
       '<div class="dgrid"><section class="panel"><div class="panelhead"><div><h2>Prazos e decisões pendentes</h2><small>' +
       (attention.length > 8
-        ? 'As 8 mais críticas de ' + attention.length
-        : 'Situações que exigem acompanhamento') +
+        ? 'As 8 paradas há mais tempo, de ' + attention.length + ' sem alteração há mais de ' + IDLE_DAYS + ' dias'
+        : 'Obras sem alteração há mais de ' + IDLE_DAYS + ' dias') +
       '</small></div>' +
       (attention.length
         ? '<button class="textbtn" onclick="dashOpen(\'attention\')">Ver todas</button>'
@@ -250,11 +261,70 @@
       '<section class="panel"><div class="panelhead"><div><h2>Obras por situação</h2><small>Status informado nas obras</small></div></div>' +
       '<div class="panelbody"><div id="dashStatus" class="dchart" style="height:300px"></div></div></section></div>' +
       
-      '<div class="dgrid" style="grid-template-columns:1fr"><section class="panel"><div class="panelhead"><div><h2>Avanço físico por projeto</h2><small>Média das medições informadas · confira a cobertura</small></div></div>' +
-      '<div class="panelbody"><div id="dashProgress" class="dchart" style="height:300px"></div></div></section>' +
+      '<div class="dgrid" style="grid-template-columns:1fr">' +
+      (isSysAdmin() ? recentEditorsPanel() : recentObrasPanel(all)) +
       '</div>'
     );
   };
+
+  function openBtn(pid,rid){return '<button type="button" class="btn" onclick="editRecord(\''+esc(pid)+"','"+esc(rid)+'\')">Abrir '+icon('arrow')+'</button>'}
+
+  // Usuário: obras editadas mais recentemente, com data e hora.
+  function recentObrasPanel(all){
+    var list=all.filter(function(i){return i.lastEdit}).sort(function(a,b){return b.lastEdit-a.lastEdit}).slice(0,10);
+    return '<section class="panel recent-panel"><div class="panelhead"><div><h2>Obras editadas recentemente</h2><small>As 10 alterações mais recentes, com data e hora</small></div></div>'+
+      '<ul class="att-list recent-list">'+(list.length?list.map(function(i){
+        return '<li class="att-row"><div class="att-main"><b>'+esc(i.title)+'</b><small>'+esc(i.x.p.name||'')+(i.agency?' · '+esc(i.agency):'')+'</small>'+
+          '<span class="att-tags"><span class="att-tag recent">'+icon('clock')+' '+esc(dateTime(i.lastEdit))+'</span></span></div>'+openBtn(i.x.p.id,i.x.r.id)+'</li>';
+      }).join(''):'<li class="att-empty">'+icon('clock')+'<b>Nenhuma edição registrada</b><small>As obras alteradas aparecerão aqui.</small></li>')+'</ul></section>';
+  }
+
+  // Administrador: quem editou recentemente, com as obras e o horário de cada edição.
+  var editorsCache=null; // {at, data | error | loading}
+  var EDITORS_DAYS=30;
+  function recentEditorsPanel(){
+    return '<section class="panel recent-panel"><div class="panelhead"><div><h2>Quem editou recentemente</h2><small>Usuários que registraram alterações nos últimos '+EDITORS_DAYS+' dias, com as obras editadas</small></div>'+
+      '<button class="textbtn" onclick="go(\'history\')">Ver auditoria</button></div>'+
+      '<div class="panelbody" id="dashEditors">'+editorsHtml()+'</div></section>';
+  }
+  function editorsHtml(){
+    if(!editorsCache||editorsCache.loading&&!editorsCache.data)return '<p class="dash-editors-msg" role="status">Consultando a auditoria…</p>';
+    if(editorsCache.error)return '<p class="dash-editors-msg">Não foi possível consultar quem editou: '+esc(editorsCache.error)+'</p>';
+    var users=editorsCache.data||[];
+    if(!users.length)return '<p class="dash-editors-msg">Nenhuma edição de usuário nos últimos '+EDITORS_DAYS+' dias.</p>';
+    return '<div class="editor-grid">'+users.map(function(u){
+      var obras=u.obras||[];
+      return '<article class="editor-card"><header><span class="editor-avatar" aria-hidden="true">'+esc(initials(u.who))+'</span><div><b>'+esc(u.who||'Usuário')+'</b>'+
+        '<small>Última edição: '+esc(dateTime(new Date(u.lastAt)))+'</small></div>'+
+        '<span class="editor-count" title="Obras editadas no período">'+u.obrasCount+(u.obrasCount===1?' obra':' obras')+'</span></header>'+
+        '<ul>'+obras.map(function(o){
+          var cur=currentObra(o);
+          return '<li><button type="button" onclick="editRecord(\''+esc(o.projectId)+"','"+esc(o.recordId)+'\')" title="Abrir obra"><span>'+esc(cur.name)+'</span>'+
+            '<small>'+esc(dateTime(new Date(o.at)))+' · '+o.changes+(o.changes===1?' campo alterado':' campos alterados')+'</small></button></li>';
+        }).join('')+(u.obrasCount>obras.length?'<li class="editor-more">e mais '+(u.obrasCount-obras.length)+' obra(s) · veja na auditoria</li>':'')+'</ul></article>';
+    }).join('')+'</div>';
+  }
+  // Nome atual da obra (a auditoria guarda o nome da época da edição).
+  function currentObra(o){
+    var projects=typeof visible==='function'?visible():db.projects||[];
+    var p=projects.find(function(x){return String(x.id)===String(o.projectId)});
+    var r=p&&(p.records||[]).find(function(x){return String(x.id)===String(o.recordId)});
+    return {name:r?recordTitle(r,p):(o.recordName||'Obra')+(p?' (excluída)':''),project:p?p.name:o.projectName};
+  }
+  function initials(name){var p=String(name||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase()}
+  function loadRecentEditors(generation){
+    var paint=function(){var el=document.getElementById('dashEditors');if(el)el.innerHTML=editorsHtml()};
+    var fresh=editorsCache&&!editorsCache.error&&!editorsCache.loading&&Date.now()-editorsCache.at<60000;
+    if(fresh||editorsCache&&editorsCache.loading)return paint();
+    if(!window.sb){editorsCache={at:Date.now(),error:'conexão indisponível.'};return paint()}
+    editorsCache={at:Date.now(),loading:true,data:editorsCache&&editorsCache.data};
+    window.sb.rpc('secap_recent_editors',{p_days:EDITORS_DAYS,p_users:12,p_obras:6}).then(function(res){
+      editorsCache=res.error?{at:Date.now(),error:/secap_recent_editors/.test(res.error.message||'')?'aplique supabase/security/recent_editors.sql no banco.':res.error.message}:{at:Date.now(),data:Array.isArray(res.data)?res.data:[]};
+      if(tab==='dashboard')paint();
+    },function(e){editorsCache={at:Date.now(),error:String(e&&e.message||e)};if(tab==='dashboard')paint()});
+  }
+  // Depois de salvar uma obra, a lista de quem editou é consultada de novo.
+  window.addEventListener('secap:obra-saved',function(){if(editorsCache&&!editorsCache.loading)editorsCache.at=0});
 
   function empty(el, msg) {
     el.innerHTML = '<div class="dchart-empty">' + msg + '</div>';
@@ -493,7 +563,7 @@
     var projects = (typeof visible==='function'?visible():db.projects||[]);
     var all = rowsOf(projects).map(info);
     var f = {
-      attention:[function(i){return score(i)>0},'Prazos e decisões pendentes'],
+      attention:[function(i){return i.idle},'Obras sem alteração há mais de '+IDLE_DAYS+' dias'],
       all: [
         function () {
           return true;
@@ -533,6 +603,7 @@
     }[kind];
     if (!f) return;
     var list = all.filter(f[0]);
+    if(kind==='attention')list.sort(function(a,b){return b.idleDays-a.idleDays});
     var body = list.length
       ? '<div class="kpi-detail-list">' +
         list
@@ -552,6 +623,7 @@
               esc(i.x.p.name || '') +
               ' · ' +
               esc(i.status) +
+              (kind==='attention'?' · '+esc(idleText(i.idleDays))+' (desde '+esc(dateTime(i.lastEdit))+')':'') +
               '</small></span><span class="kpi-detail-value">' +
               (i.progress !== null ? i.progress + '% ' : '') +
               '</span>' +
