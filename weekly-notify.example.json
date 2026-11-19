@@ -1,0 +1,17 @@
+{
+  "ativo": true,
+  "dia_semana": 0,
+  "hora": "08:00",
+  "portal_url": "http://127.0.0.1:8080",
+  "supabase_url": "http://127.0.0.1:54321",
+  "service_role_key": "",
+  "smtp": {
+    "host": "",
+    "porta": 587,
+    "seguranca": "starttls",
+    "usuario": "",
+    "senha": "",
+    "remetente": "",
+    "nome_remetente": "Portal SECAP"
+  }
+}

@@ -20,7 +20,13 @@ const APP_SCRIPTS = [
   'field-rename.js',
   'portal.js',
   'weekly-log.js',
+  'weekly-notify.js',
+  'admin-notifications.js',
   'report-export.js',
+  'work-responsibility.js',
+  'project-work-selection.js',
+  'project-permission-review.js',
+  'work-responsible-monitor.js',
 ];
 
 function showBootError(message) {
@@ -428,7 +434,7 @@ async function signInAccount(sb, path, data) {
     return jsonResponse(403, {
       error: refused
         ? 'Seu acesso ao sistema foi recusado pelo administrador.'
-        : 'Seu cadastro ainda aguarda liberação do administrador.',
+        : 'Espere o Administrador aceitar seu cadastro para entrar.',
     });
   }
   return jsonResponse(200, { ok: true });
@@ -436,14 +442,26 @@ async function signInAccount(sb, path, data) {
 
 async function listCalendar(sb, owner) {
   const { data, error } = await sb.rpc('secap_calendar_list');
-  if(error) return jsonResponse(500, {error:'Não foi possível consultar a agenda. Aplique supabase/security/agenda_audit_update.sql no banco do portal. '+error.message});
-  return jsonResponse(200, {items:data?.items || []});
+  if (error)
+    return jsonResponse(500, {
+      error:
+        'Não foi possível consultar a agenda. Aplique supabase/security/agenda_audit_update.sql no banco do portal. ' +
+        error.message,
+    });
+  return jsonResponse(200, { items: data?.items || [] });
 }
 
 async function saveCalendar(sb, owner, data) {
   const item = calendarItem(data);
   if (!item) return jsonResponse(400, { error: 'Confira título, data, horário e participantes.' });
-  if(item.kind==='meeting'){const ready=await sb.rpc('secap_calendar_list');if(ready.error)return jsonResponse(400,{error:'Para compartilhar a reunião, aplique supabase/security/agenda_audit_update.sql no banco do portal.'});}
+  if (item.kind === 'meeting') {
+    const ready = await sb.rpc('secap_calendar_list');
+    if (ready.error)
+      return jsonResponse(400, {
+        error:
+          'Para compartilhar a reunião, aplique supabase/security/agenda_audit_update.sql no banco do portal.',
+      });
+  }
   const { error } = await sb.from('calendar_items').upsert({ id: item.id, owner, body: item });
   if (error) {
     const hidden = error.code === '23505' || error.code === '42501';
@@ -652,17 +670,51 @@ async function saveObraApi(sb, data, authUser, authRole) {
     }
   }
 
+  const ownerState = await sb.rpc('secap_read_state');
+  if (ownerState.error)
+    return jsonResponse(500, { error: 'Não foi possível validar o responsável da obra.' });
+  const ownerProject = ownerState.data?.projects?.find((p) => String(p.id) === projectId);
+  const ownerKey = ownerProject?.biMapping?.owner || 'responsavel';
+  const ownerValue = record[ownerKey] ?? record.responsavel;
+  if (
+    !String(ownerValue || '')
+      .split(/[;\n]+/)
+      .some(
+        (name) =>
+          name.trim() &&
+          ![
+            '—',
+            '-',
+            'sem responsável',
+            'sem responsavel',
+            'não informado',
+            'nao informado',
+          ].includes(name.trim().toLowerCase())
+      )
+  )
+    return jsonResponse(400, {
+      error: 'É obrigatório informar pelo menos um responsável pela obra.',
+    });
   const row = recordToObraRow(projectId, record);
   // Obra existente: usa UPDATE puro. Um upsert dispara primeiro o gatilho BEFORE INSERT
   // (tg_op = 'INSERT'), que bloqueia qualquer campo preenchido e não liberado — por isso
   // o usuário recebia "Sem permissão para editar o campo valor" ao editar outro campo.
-  let error;
+  let error, written;
   if (rowExists) {
     const { id, project_id, nome_planilha, planilha_id, ...changes } = row;
-    ({ error } = await sb.from('obras').update(changes).eq('id', id));
+    ({ error, data: written } = await sb
+      .from('obras')
+      .update(changes)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle());
   } else {
-    ({ error } = await sb.from('obras').upsert(row));
+    ({ error, data: written } = await sb.from('obras').upsert(row).select('id').single());
   }
+  if (!error && !written)
+    return jsonResponse(403, {
+      error: 'O banco não confirmou a gravação. Verifique a permissão de edição desta obra.',
+    });
   if (error) {
     return jsonResponse(400, { error: `Erro ao salvar obra no Supabase: ${error.message}` });
   }
@@ -828,8 +880,10 @@ async function exportBackup(sb, owner) {
       };
     }
   }
-  const ownedAgenda = await sb.from('calendar_items').select('body').eq('owner',owner);
-  const agenda = ownedAgenda.error ? jsonResponse(500,{error:ownedAgenda.error.message}) : jsonResponse(200,{items:(ownedAgenda.data || []).map(row=>row.body)});
+  const ownedAgenda = await sb.from('calendar_items').select('body').eq('owner', owner);
+  const agenda = ownedAgenda.error
+    ? jsonResponse(500, { error: ownedAgenda.error.message })
+    : jsonResponse(200, { items: (ownedAgenda.data || []).map((row) => row.body) });
   if (!agenda.ok) return agenda;
   const items = await agenda.json();
 }
@@ -920,7 +974,7 @@ async function bootCloud(config) {
 
   loadingStep('Verificando seu acesso…', 35);
   const existing = await sb.auth.getUser();
-  window.SECAP_ACTOR_ID = existing.data?.user?.id || ''; 
+  window.SECAP_ACTOR_ID = existing.data?.user?.id || '';
   let email = '';
   let active = false;
   if (existing.data?.user && !existing.error) {
@@ -949,6 +1003,11 @@ async function bootCloud(config) {
         };
       }
     } else {
+      // Conta criada/entrada com Google (ou sessão antiga) ainda sem liberação: avisa na tela de login.
+      window.SECAP_ACCESS_NOTICE = {
+        kind: profile.data?.role === 'recusado' ? 'refused' : 'pending',
+        email: profile.data?.email || existing.data.user.email || '',
+      };
       await sb.auth.signOut();
     }
   }

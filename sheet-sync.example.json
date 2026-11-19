@@ -1,0 +1,16 @@
+{
+  "ativo": true,
+  "planilha_id": "1PdWOKlo4Bf_K0yLStR06cRCf000zzKAfyivCEKFFizo",
+  "aba": "PIPELINE",
+  "projeto_id": "8a68ca25-f76f-498c-819a-5e7743122a0c",
+  "credenciais": "data/google-service-account.json",
+  "supabase_url": "http://127.0.0.1:54321",
+  "service_role_key": "",
+  "intervalo_segundos": 60,
+  "primeira_sincronia": "relatorio",
+  "conflito": "portal",
+  "campo_id": "codigo",
+  "campos_ignorados": ["responsavel"],
+  "criar_obras_da_planilha": true,
+  "criar_linhas_do_portal": true
+}

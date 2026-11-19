@@ -66,7 +66,7 @@ async function submitRegistration(form) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Não foi possível enviar a solicitação.');
-    form.innerHTML = `<div class="registration-success"><h2>Solicitação enviada!</h2><p>Seu cadastro foi recebido. O administrador irá avaliar as informações e analisar a liberação do seu acesso ao SECAP.</p></div><button class="btn primary" type="button" onclick="showLogin()">Voltar para entrar</button>`;
+    form.innerHTML = `<div class="registration-success"><h2>Espere o Administrador aceitar</h2><p>Seu cadastro foi recebido. O administrador irá avaliar as informações e liberar o seu acesso ao SECAP. Você só conseguirá entrar depois dessa aceitação.</p></div><button class="btn primary" type="button" onclick="showLogin()">Voltar para entrar</button>`;
   } catch (e) {
     msg.textContent = e.message;
   }

@@ -299,11 +299,52 @@
         '<span class="editor-count" title="Obras editadas no período">'+u.obrasCount+(u.obrasCount===1?' obra':' obras')+'</span></header>'+
         '<ul>'+obras.map(function(o){
           var cur=currentObra(o);
-          return '<li><button type="button" onclick="editRecord(\''+esc(o.projectId)+"','"+esc(o.recordId)+'\')" title="Abrir obra"><span>'+esc(cur.name)+'</span>'+
+          return '<li><button type="button" data-actor="'+esc(u.actor||'')+'" data-record="'+esc(o.recordId)+'" data-project="'+esc(o.projectId)+'" data-who="'+esc(u.who||'Usuário')+'" onclick="openEditorChanges(this.dataset)" title="Ver o que foi alterado"><span>'+esc(cur.name)+'</span>'+
             '<small>'+esc(dateTime(new Date(o.at)))+' · '+o.changes+(o.changes===1?' campo alterado':' campos alterados')+'</small></button></li>';
         }).join('')+(u.obrasCount>obras.length?'<li class="editor-more">e mais '+(u.obrasCount-obras.length)+' obra(s) · veja na auditoria</li>':'')+'</ul></article>';
     }).join('')+'</div>';
   }
+  // Clique numa obra do painel: mostra o detalhe do que esse usuário alterou nela
+  // (campo, antes → depois, data/hora e justificativa), sem abrir a obra.
+  function editorValue(v,present){
+    if(present===false||v===null||v===undefined||v==='')return '—';
+    return typeof v==='object'?JSON.stringify(v):String(v);
+  }
+  function editorReason(c){
+    var reason=String(c.reason||'').trim();
+    if(!reason||reason==='Não informada')return '';
+    var map=typeof auditObraReasons==='function'?auditObraReasons(reason):null;
+    if(map)return map.get(c.recordName)||'';
+    return reason;
+  }
+  window.openEditorChanges=function(d){
+    var o={projectId:d.project,recordId:d.record},cur=currentObra(o);
+    var title='Alterações de '+(d.who||'usuário');
+    var foot='<button class="btn" type="button" onclick="closeModal()">Fechar</button>'+
+      '<button class="btn" type="button" onclick="closeModal();go(\'history\')">Ver auditoria</button>'+
+      '<button class="btn primary" type="button" data-project="'+esc(d.project)+'" data-record="'+esc(d.record)+'" onclick="closeModal();editRecord(this.dataset.project,this.dataset.record)">Abrir obra</button>';
+    var head='<p class="editor-detail-obra"><strong>'+esc(cur.name)+'</strong>'+(cur.project?'<br><small>'+esc(cur.project)+' · últimos '+EDITORS_DAYS+' dias</small>':'')+'</p>';
+    modal(title,head+'<div id="editorChangesBody"><p class="dash-editors-msg" role="status">Consultando as alterações…</p></div>',foot);
+    if(!d.actor||!window.sb){
+      var el0=document.getElementById('editorChangesBody');
+      if(el0)el0.innerHTML='<p class="dash-editors-msg">Detalhe indisponível. Aplique supabase/security/recent_editor_details.sql no banco.</p>';
+      return;
+    }
+    window.sb.rpc('secap_recent_editor_changes',{p_actor:d.actor,p_record:d.record,p_days:EDITORS_DAYS}).then(function(res){
+      var el=document.getElementById('editorChangesBody');if(!el)return;
+      if(res.error){el.innerHTML='<p class="dash-editors-msg">Não foi possível consultar: '+esc(/secap_recent_editor_changes/.test(res.error.message||'')?'aplique supabase/security/recent_editor_details.sql no banco.':res.error.message)+'</p>';return}
+      var rows=Array.isArray(res.data)?res.data:[];
+      if(!rows.length){el.innerHTML='<p class="dash-editors-msg">Nenhuma alteração encontrada no período.</p>';return}
+      el.innerHTML='<div class="editor-changes-scroll"><table class="audit-details-table editor-changes-table"><thead><tr><th>Data e hora</th><th>Campo</th><th>Antes</th><th>Depois</th><th>Justificativa</th></tr></thead><tbody>'+
+        rows.map(function(c){
+          var field=c.fieldId?(c.field||c.fieldId):(c.action||'Obra');
+          var before=c.fieldId?editorValue(c.before,c.beforePresent):(c.beforePresent?'Dados da obra':'—');
+          var after=c.fieldId?editorValue(c.after,c.afterPresent):(c.afterPresent?'Dados da obra':'—');
+          var why=editorReason(c);
+          return '<tr><td>'+esc(dateTime(new Date(c.at)))+'</td><td><strong>'+esc(field)+'</strong></td><td class="editor-before">'+esc(before)+'</td><td class="editor-after"><b>'+esc(after)+'</b></td><td>'+(why?esc(why):'<span class="editor-none">Não informada</span>')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+    },function(e){var el=document.getElementById('editorChangesBody');if(el)el.innerHTML='<p class="dash-editors-msg">Não foi possível consultar: '+esc(String(e&&e.message||e))+'</p>'});
+  };
   // Nome atual da obra (a auditoria guarda o nome da época da edição).
   function currentObra(o){
     var projects=typeof visible==='function'?visible():db.projects||[];

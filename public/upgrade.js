@@ -1189,7 +1189,7 @@ admin = function () {
       'Esta área está disponível somente para o perfil administrador.'
     );
 
-  if (!['access', 'field-perms'].includes(adminSection)) {
+  if (!['access', 'field-perms', 'project-check'].includes(adminSection)) {
     adminSection = 'access';
   }
 
@@ -1209,10 +1209,11 @@ admin = function () {
         ${icon('user')}Acesso ao sistema
       </button>
       <button class="${adminSection === 'field-perms' ? 'active' : ''}" aria-current="${adminSection === 'field-perms' ? 'page' : 'false'}" onclick="setAdminSection('field-perms')">
-        ${icon('edit')}Permissões por campo
+        ${icon('edit')}Permissões do projeto
       </button>
+      <button class="${adminSection === 'project-check' ? 'active' : ''}" aria-current="${adminSection === 'project-check' ? 'page' : 'false'}" onclick="setAdminSection('project-check')">${icon('shield')}Verificação do projeto</button>
     </nav>` +
-    (adminSection === 'field-perms' ? adminFieldPermissions() : adminSolicitacoes() + adminAccess())
+    (adminSection === 'project-check' ? adminProjectVerification() : adminSection === 'field-perms' ? adminFieldPermissions() : adminSolicitacoes() + adminAccess())
   );
 };
 
@@ -1304,7 +1305,7 @@ async function loadFieldPermUsers() {
   }
 }
 
-// 2. Renderização da Sub-aba "Permissões por campo"
+// 2. Renderização da Sub-aba "Permissões do projeto"
 function adminFieldPermissions() {
   const users = getApprovedPortalUsers();
   const projects = Array.isArray(db.projects) ? db.projects : [];

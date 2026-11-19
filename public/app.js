@@ -279,15 +279,18 @@ const navs = [
   ['dashboard', 'Visão geral', 'dashboard'],
   ['projects', 'Projetos', 'folder'],
   ['kanban', 'Acompanhamento', 'kanban'],
-  ['bi', 'BI · Painéis', 'chart'],
+  ['bi', 'BI/Painéis', 'chart'],
   ['calendar', 'Calendário', 'calendar'],
   ['terms', 'Termos de compromisso', 'file'],
-  ['solicitacoes', 'Solicitações', 'link'],
   ['profile', 'Meu perfil', 'user'],
   ['notes', 'Minhas anotações', 'note'],
+  ['solicitacoes', 'Solicitações', 'link'],
   ['history', 'Auditoria', 'history'],
   ['admin', 'Administração', 'shield'],
 ];
+// Itens do grupo "GESTÃO E ACOMPANHAMENTO"; os demais ficam em "ÁREA PESSOAL".
+// (Definido por chave, não por posição, para não quebrar quando a ordem do menu muda.)
+const managementNavs = ['dashboard', 'projects', 'kanban', 'bi', 'calendar', 'terms'];
 
 // Link externo das Solicitações (Apps Script). Configurado em public/supabase-config.js.
 function solicitacoesUrl() {
@@ -322,6 +325,16 @@ function go(t, id = '') {
   window.scrollTo(0, 0);
 }
 
+function accessNoticeMarkup() {
+  const notice = window.SECAP_ACCESS_NOTICE;
+  if (!notice || window.SECAP_SETUP) return '';
+  const refused = notice.kind === 'refused';
+  const who = notice.email ? ` (${esc(notice.email)})` : '';
+  return refused
+    ? `<div class="access-notice is-refused" role="alert"><strong>Acesso recusado</strong><p>Seu acesso${who} foi recusado pelo administrador. Fale com o administrador do SECAP.</p></div>`
+    : `<div class="access-notice" role="alert"><strong>Espere o Administrador aceitar</strong><p>Seu cadastro${who} foi recebido. Você poderá entrar assim que o administrador liberar o seu acesso.</p></div>`;
+}
+
 function login() {
   const registering = authView === 'register' && !window.SECAP_SETUP;
   const heading = window.SECAP_SETUP
@@ -339,7 +352,7 @@ function login() {
     : registering
       ? `<form onsubmit="event.preventDefault();submitRegistration(this)"><div class="field"><label>Nome completo *</label><input name="name" required maxlength="120" autocomplete="name"></div><div class="field"><label>E-mail *</label><input name="email" type="email" required maxlength="254" autocomplete="email"></div><div class="field"><label>Senha *</label><input name="password" type="password" required minlength="12" maxlength="512" autocomplete="new-password"><small>Mínimo de 12 caracteres.</small></div><div class="field"><label>Cargo *</label><input name="job_title" required maxlength="120" placeholder="Ex.: Analista de projetos"></div><button class="btn primary" type="submit">Enviar solicitação</button><p id="registerMessage" role="status"></p></form><button class="login-create" type="button" onclick="showLogin()">Voltar para entrar</button>`
       : `<form onsubmit="event.preventDefault();authenticate(this)"><div class="field"><label>E-mail</label><input name="email" type="email" required autocomplete="username"></div><div class="field"><label>Senha</label><input name="password" type="password" required minlength="12" autocomplete="${window.SECAP_SETUP ? 'new-password' : 'current-password'}"><small>Mínimo de 12 caracteres.</small></div><button class="btn primary" type="submit">${window.SECAP_SETUP ? 'Criar administrador' : 'Entrar'}</button><p id="authMessage" role="status"></p></form>${window.SECAP_SETUP ? '' : `<div class="login-divider"><span>ou</span></div><button class="btn google-login" type="button" onclick="googleLogin()"><span class="google-g">G</span> Continuar com Google</button><button class="login-create" type="button" onclick="showRegister()">Criar conta</button><p id="socialAuthMessage" class="social-auth-message" role="status"></p>`}`;
-  return `<div class="stripe"></div><div class="login"><section class="loginart"><img class="loginart-logo" src="logo-negative.png" alt="Prefeitura de Goiânia"><h1>Projetos que avançam.<br>Uma cidade que transforma.</h1><p>Planejamento, acompanhamento e decisões conectados em um só lugar.</p></section><section class="loginform"><div class="eyebrow">PORTAL DE PROJETOS</div><h1>${heading}</h1><p class="subtitle">${subtitle}</p>${formMarkup}</section></div>`;
+  return `<div class="stripe"></div><div class="login"><section class="loginart"><img class="loginart-logo" src="logo-negative.png" alt="Prefeitura de Goiânia"><h1>Projetos que avançam.<br>Uma cidade que transforma.</h1><p>Planejamento, acompanhamento e decisões conectados em um só lugar.</p></section><section class="loginform"><div class="eyebrow">PORTAL DE PROJETOS</div><h1>${heading}</h1><p class="subtitle">${subtitle}</p>${accessNoticeMarkup()}${formMarkup}</section></div>`;
 }
 
 function showRegister() {
@@ -516,11 +529,11 @@ function render() {
   if (!allowed(tab)) tab = 'profile';
   $('#app').innerHTML =
     `<div class="stripe"></div><div class="shell"><aside class="sidebar" id="sidebar"><div class="brand"><img class="brand-logo" src="logo-negative.png" alt="Prefeitura de Goiânia"></div><div class="navlabel">GESTÃO E ACOMPANHAMENTO</div>${navs
-      .slice(0, 7)
+      .filter((n) => managementNavs.includes(n[0]))
       .filter((n) => allowed(n[0]))
       .map(nav)
       .join('')}<div class="navlabel">ÁREA PESSOAL</div>${navs
-      .slice(7)
+      .filter((n) => !managementNavs.includes(n[0]))
       .filter((n) => allowed(n[0]))
       .map(nav)
       .join(
@@ -1122,9 +1135,7 @@ function renderProjectsBarChart(projects) {
 // Fica em p.responsibles = [{ id, name, email }]. Os nomes digitados nas obras
 // (campo "Responsável") e o responsável antigo da pasta não aparecem mais aqui.
 function projectResponsibleList(p) {
-  return Array.isArray(p?.responsibles)
-    ? p.responsibles.filter((u) => u && (u.email || u.id))
-    : [];
+  return Array.isArray(p?.responsibles) ? p.responsibles.filter((u) => u && (u.email || u.id)) : [];
 }
 function projectResponsibles(p) {
   const list = projectResponsibleList(p);
@@ -1162,7 +1173,9 @@ function openProjectResponsibles(pid) {
   if (!p || !isSysAdmin()) return;
   responsiblesPicker = {
     pid: String(pid),
-    selected: new Map(projectResponsibleList(p).map((u) => [String(u.email || u.id).toLowerCase(), u])),
+    selected: new Map(
+      projectResponsibleList(p).map((u) => [String(u.email || u.id).toLowerCase(), u])
+    ),
     users: [],
     query: '',
     offset: 0,
@@ -1220,8 +1233,7 @@ function renderProjectResponsibles() {
     })
     .join('');
   opts.innerHTML =
-    (rows ||
-      (state.loading ? '' : '<p class="presp-empty">Nenhum usuário encontrado.</p>')) +
+    (rows || (state.loading ? '' : '<p class="presp-empty">Nenhum usuário encontrado.</p>')) +
     (state.loading ? '<p class="resp-loading" role="status">Carregando usuários…</p>' : '') +
     (state.hasMore && !state.loading
       ? `<button class="textbtn" type="button" onclick="loadProjectResponsibles(true)">Carregar mais usuários</button>`
@@ -1233,7 +1245,12 @@ function toggleProjectResponsible(id, on) {
   if (!state) return;
   const u = state.users.find((x) => String(x.id) === String(id));
   if (!u) return;
-  if (on) state.selected.set(responsibleKey(u), { id: u.id, name: u.name || u.email, email: u.email || '' });
+  if (on)
+    state.selected.set(responsibleKey(u), {
+      id: u.id,
+      name: u.name || u.email,
+      email: u.email || '',
+    });
   else state.selected.delete(responsibleKey(u));
   renderProjectResponsibles();
 }
@@ -1275,9 +1292,14 @@ async function loadProjectResponsibles(more = false) {
       p_search: state.query,
       p_offset: state.offset,
     });
-    if (result.error && (result.error.code === 'PGRST202' || /schema cache/.test(result.error.message || ''))) {
+    if (
+      result.error &&
+      (result.error.code === 'PGRST202' || /schema cache/.test(result.error.message || ''))
+    ) {
       if (!isSysAdmin())
-        throw new Error('A lista de usuários ainda não foi instalada neste banco. Solicite ao administrador aplicar supabase/security/meeting_participants.sql.');
+        throw new Error(
+          'A lista de usuários ainda não foi instalada neste banco. Solicite ao administrador aplicar supabase/security/meeting_participants.sql.'
+        );
       const term = state.query.replace(/[%,().]/g, '');
       let directory = window.sb
         .from('profiles')
@@ -1288,7 +1310,12 @@ async function loadProjectResponsibles(more = false) {
       if (term) directory = directory.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
       const fallback = await directory.range(state.offset, state.offset + 50);
       if (fallback.error) throw fallback.error;
-      result = { data: { users: (fallback.data || []).slice(0, 50), hasMore: (fallback.data || []).length > 50 } };
+      result = {
+        data: {
+          users: (fallback.data || []).slice(0, 50),
+          hasMore: (fallback.data || []).length > 50,
+        },
+      };
     }
     if (state !== responsiblesPicker || request !== state.request) return;
     if (result.error) throw result.error;
@@ -1325,7 +1352,13 @@ function saveProjectResponsibles() {
   responsiblesPicker = null;
   closeModal();
   if (before !== after) {
-    persist('Atualizou responsáveis do projeto', p, before || 'Nenhum', after || 'Nenhum', 'Responsáveis');
+    persist(
+      'Atualizou responsáveis do projeto',
+      p,
+      before || 'Nenhum',
+      after || 'Nenhum',
+      'Responsáveis'
+    );
     notify(
       p.responsibles.length
         ? `${p.responsibles.length} responsável(is) definido(s) para ${p.name}.`
@@ -2053,103 +2086,55 @@ function projectMatches(p) {
 }
 
 // Cartão de projeto no estilo Trello
+// Cards informativos: não representam etapas nem alteram o status dos projetos.
 function kanbanCard(p) {
   const color = p.color || '#003856',
     rs = p.records || [],
     withPct = rs.filter((r) => r.progresso !== '' && r.progresso != null),
-    pct = withPct.length ? avg(withPct) : null,
-    lateCount = rs.filter((r) => late(r)).length,
-    editable = canEdit(p),
-    stage = projectStage(p);
-  return `<article class="kanban tcard" style="border-top:4px solid ${color}" draggable="${editable}" ondragstart="kanbanDragStart(event,'${
-    p.id
-  }')" ondragend="kanbanDragEnd(this)"><button class="tcard-title" onclick="go('projects','${
-    p.id
-  }')"><h3>${esc(p.name)}</h3></button><p class="tcard-next">${esc(
-    p.description || 'Sem descrição'
-  )}</p>${
-    pct != null
-      ? `<div class="pr"><div class="progress"><i style="width:${Math.min(100, pct)}%;background:${color}"></i></div>${pct}%</div>`
-      : ''
-  }<div class="tcard-foot"><span class="tcard-chip" title="Obras vinculadas">${icon('folder')}${
-    rs.length
-  } ${rs.length === 1 ? 'obra' : 'obras'}</span>${
-    lateCount
-      ? `<span class="tcard-chip late" title="Obras com prazo vencido">${icon('alert')}${lateCount} em atraso</span>`
-      : ''
-  }<span class="tcard-spacer"></span><span class="tcard-avatar" title="${esc(
-    p.owner || 'Sem responsável'
-  )}">${esc(initials(p.owner))}</span></div>${
-    editable
-      ? `<select class="tcard-move" aria-label="Alterar etapa de ${esc(
-          p.name
-        )}" onchange="moveProject('${p.id}',this.value)">${PROJECT_STAGES.map(
-          (v) => `<option ${stage === v ? 'selected' : ''}>${esc(v)}</option>`
-        ).join('')}</select>`
-      : ''
-  }</article>`;
-}
-
-function kanbanColumn(o, i, ps) {
-  const items = ps.filter((p) => projectStage(p) === o);
-  return `<section class="column tlist" data-drop="${esc(
-    o
-  )}" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('dragover')" ondrop="this.classList.remove('dragover');dropProject(event,this.dataset.drop)"><div class="colhead"><span><span class="dot" style="background:${
-    KANBAN_DOTS[i % 4]
-  }"></span>${esc(o)}</span><em>${items.length}</em></div><div class="tlist-cards">${
-    items.map(kanbanCard).join('') || '<div class="tlist-empty">Solte um projeto aqui</div>'
-  }</div></section>`;
-}
-
-function kanbanDragStart(e, pid) {
-  e.dataTransfer.setData('text/plain', pid);
-  e.dataTransfer.effectAllowed = 'move';
-  const el = e.currentTarget;
-  setTimeout(() => el.classList.add('dragging'), 0);
-}
-
-function kanbanDragEnd(el) {
-  el.classList.remove('dragging');
-  document.querySelectorAll('.tlist.dragover').forEach((c) => c.classList.remove('dragover'));
-}
-
-function moveProject(pid, stage) {
-  const p = db.projects.find((p) => p.id === pid);
-  if (!p || !canEdit(p)) return notify('Edição não permitida.');
-  if (!PROJECT_STAGES.includes(stage)) return;
-  const before = projectStage(p);
-  if (before === stage && p.stage === stage) return;
-  p.stage = stage;
-  persist('Alterou etapa do projeto', p, before, stage);
-  render();
-  notify('Etapa do projeto atualizada.');
-}
-
-function dropProject(e, stage) {
-  e.preventDefault();
-  moveProject(e.dataTransfer.getData('text/plain'), stage);
+    pct = withPct.length ? avg(withPct) : null;
+  return `<article class="kanban tcard" style="border-top:4px solid ${color}">
+    <button class="tcard-title" onclick="go('projects','${p.id}')"><h3>${esc(p.name)}</h3></button>
+    <p class="tcard-next">${esc(p.description || 'Sem descrição')}</p>
+    ${
+      pct != null
+        ? `<div class="pr"><div class="progress"><i style="width:${Math.min(100, pct)}%;background:${color}"></i></div>${pct}%</div>`
+        : ''
+    }
+    <div class="tcard-foot">
+      <span class="tcard-chip" title="Obras vinculadas">${icon('folder')}${rs.length} ${rs.length === 1 ? 'obra' : 'obras'}</span>
+      <span class="tcard-spacer"></span>
+      <span class="tcard-avatar" title="${esc(p.owner || 'Sem responsável')}">${esc(initials(p.owner))}</span>
+    </div>
+  </article>`;
 }
 
 function kanban() {
   const ps = visible()
     .filter((p) => !filterProject || p.id === filterProject)
-    .filter((p) => !filterStatus || projectStage(p) === filterStatus)
     .filter(projectMatches);
   return (
     head(
-      'FLUXO DE TRABALHO',
+      'VISUALIZAÇÃO DOS PROJETOS',
       'Acompanhamento',
-      'Cada projeto na sua etapa. Cada próxima ação no lugar certo.',
+      'Visualize os projetos em cards informativos, sem classificação por status.',
       btn('Ver projetos', "go('projects')", 'folder')
     ) +
-    filters() +
-    `<div class="filters"><span class="subtitle">Arraste os projetos entre as etapas ou altere a etapa no próprio cartão. Sem etapa definida, ela é deduzida das obras.</span></div><div class="board trello-board">${PROJECT_STAGES.map(
-      (o, i) => kanbanColumn(o, i, ps)
-    ).join('')}</div>${
-      visible().length
-        ? ''
-        : empty('Nenhum projeto', 'Crie um projeto para acompanhá-lo no quadro.')
-    }`
+    `<div class="filters">
+      <div class="search">${icon('search')}<input aria-label="Buscar" placeholder="Buscar projeto, obra ou responsável..." value="${esc(query)}" oninput="updateQuery(this.value)"></div>
+      <select aria-label="Filtrar projeto" onchange="filterProject=this.value;render()">
+        <option value="">Todos os projetos</option>
+        ${visible()
+          .map(
+            (p) =>
+              `<option value="${p.id}" ${filterProject === p.id ? 'selected' : ''}>${esc(p.name)}</option>`
+          )
+          .join('')}
+      </select>
+      <span class="right">${icon('folder')} ${ps.length} ${ps.length === 1 ? 'projeto' : 'projetos'}</span>
+    </div>
+    <div class="board trello-board" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));align-items:start">
+      ${ps.map(kanbanCard).join('') || empty('Nenhum projeto', 'Crie um projeto para visualizar os cards nesta área.')}
+    </div>`
   );
 }
 
@@ -2196,7 +2181,7 @@ function bi() {
   return (
     head(
       'INTELIGÊNCIA DA GESTÃO',
-      'BI · Painéis',
+      'BI/Painéis',
       'Transforme os dados dos projetos em decisões.',
       btn('Exportar dados', 'exportCSV()', 'download')
     ) +
@@ -2801,20 +2786,23 @@ function auditReviewHtml(entry) {
   const checklist = entry.details?.checklist || [];
   if (!review) {
     if (!checklist.length) return '';
-    const isReview = checklist.some((c) => /^(Alteração feita|Sem alteração):/.test(c));
+    const isReview = checklist.some((c) =>
+      /^(Alteração feita|Sem alteração|Sem marcação):/.test(c)
+    );
     return `<p><strong>${isReview ? 'Revisão das obras' : 'Tipo de mudança'}:</strong> ${esc(checklist.join('; '))}</p>`;
   }
   const changed = review.filter((r) => r.status === 'alterada').length;
   return `<h4>Revisão das obras</h4>
     <div class="obra-review-legend" aria-label="Legenda da revisão das obras">
       <span class="orl-item is-changed"><i aria-hidden="true">✓</i><span><strong>Alteração feita</strong> · ${changed} obra(s)</span></span>
-      <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · ${review.length - changed} obra(s)</span></span>
+      <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · ${review.filter((r) => r.status === 'sem_alteracao').length} obra(s)</span></span>${review.some((r) => r.status === 'sem_marcacao') ? `<span class="orl-item"><span><strong>Sem marcação</strong> · ${review.filter((r) => r.status === 'sem_marcacao').length} obra(s)</span></span>` : ''}
       <span class="orl-item is-note">${icon('note')}<span><strong>Justificativa</strong> · opcional, por obra</span></span>
     </div>
     <table class="audit-details-table audit-review-table"><thead><tr><th>Obra</th><th>Situação</th><th>Justificativa</th></tr></thead><tbody>${review
       .map((r) => {
         const on = r.status === 'alterada';
-        return `<tr><td>${esc(r.recordName || r.recordId || '—')}</td><td><span class="audit-review-status ${on ? 'is-changed' : 'is-unchanged'}"><i aria-hidden="true">✓</i>${on ? 'Alteração feita' : 'Sem alteração'}</span></td><td>${esc(r.justification || 'Não informada')}</td></tr>`;
+        const none = r.status === 'sem_marcacao';
+        return `<tr><td>${esc(r.recordName || r.recordId || '—')}</td><td><span class="audit-review-status ${on ? 'is-changed' : 'is-unchanged'}">${none ? '' : '<i aria-hidden="true">✓</i>'}${on ? 'Alteração feita' : none ? 'Sem marcação' : 'Sem alteração'}</span></td><td>${esc(r.justification || 'Não informada')}</td></tr>`;
       })
       .join('')}</tbody></table>`;
 }
@@ -3809,8 +3797,15 @@ function saveRecord(pid, rid) {
       : String(value || '').trim();
   }
 
+  if (!p.fields.some((f) => f.id === 'responsavel') && data.has('responsavel') && isSysAdmin())
+    values.responsavel = String(data.get('responsavel') || '').trim();
   if (r) {
-    const changes = p.fields.filter(
+    const changes = [
+      ...p.fields,
+      ...(!p.fields.some((f) => f.id === 'responsavel') && Object.hasOwn(values, 'responsavel')
+        ? [{ id: 'responsavel', name: 'Responsável' }]
+        : []),
+    ].filter(
       (f) =>
         (allowed === null || allowed.includes(f.id)) &&
         String(r[f.id] ?? '') !== String(values[f.id] ?? '')

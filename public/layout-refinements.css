@@ -316,58 +316,457 @@
 }
 /* O flex-basis de 40px herdado achatava o avatar dentro da coluna. */
 .avatar-current-preview .profile-avatar.avatar-current-image {
-  width: 80px !important; height: 80px !important;
-  min-width: 80px !important; min-height: 80px !important;
-  max-width: 80px !important; max-height: 80px !important;
-  flex: 0 0 80px !important; aspect-ratio: 1 / 1 !important;
-  border-radius: 50% !important; object-fit: contain !important;
-  box-sizing: border-box !important; padding: 3px;
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  max-width: 80px !important;
+  max-height: 80px !important;
+  flex: 0 0 80px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  object-fit: contain !important;
+  box-sizing: border-box !important;
+  padding: 3px;
   font-size: 24px !important;
 }
 .header-avatar-button .profile-avatar.header-profile-avatar {
-  width: 44px !important; height: 44px !important;
-  min-width: 44px !important; min-height: 44px !important;
-  max-width: 44px !important; max-height: 44px !important;
-  flex: 0 0 44px !important; aspect-ratio: 1 / 1 !important;
-  border-radius: 50% !important; box-sizing: border-box !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  max-width: 44px !important;
+  max-height: 44px !important;
+  flex: 0 0 44px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  box-sizing: border-box !important;
 }
-.audit-panel table {min-width: 1180px; width:100%}
-.audit-panel th {white-space:nowrap;color:#003856}
-.audit-panel td {white-space:normal;overflow-wrap:anywhere;vertical-align:top;min-width:130px;max-width:260px}
+.audit-panel table {
+  min-width: 1180px;
+  width: 100%;
+}
+.audit-panel th {
+  white-space: nowrap;
+  color: #003856;
+}
+.audit-panel td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  min-width: 130px;
+  max-width: 260px;
+}
 
-.audit-date-panel{margin:18px 0}.audit-date-panel h2{font-size:18px;margin-bottom:10px}.audit-date-panel .subtitle{max-height:92px;overflow:auto;margin-bottom:16px}.audit-date-form{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:14px}.audit-date-form .field{min-width:180px;margin:0}.audit-recovery-summary p{margin:12px 0;overflow-wrap:anywhere}.audit-recovery-summary>div{padding:12px;background:#f1f6f9;border-radius:8px;margin:10px 0}.audit-panel table{min-width:1400px}
+.audit-date-panel {
+  margin: 18px 0;
+}
+.audit-date-panel h2 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.audit-date-panel .subtitle {
+  max-height: 92px;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+.audit-date-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.audit-date-form .field {
+  min-width: 180px;
+  margin: 0;
+}
+.audit-recovery-summary p {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.audit-recovery-summary > div {
+  padding: 12px;
+  background: #f1f6f9;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+.audit-panel table {
+  min-width: 1400px;
+}
 
-.audit-filter-row{display:flex;align-items:center;justify-content:space-between;gap:24px}.audit-period-summary{min-width:210px}.audit-date-controls{margin-left:auto;text-align:right;max-width:760px}.audit-date-controls .audit-date-form{justify-content:flex-end;margin-top:14px}.audit-range-label{display:flex;justify-content:flex-end;align-items:baseline;gap:10px}.audit-range-label span{font-size:12px;color:#61798a}.audit-range-label strong{font-size:19px;color:#003856}.audit-available{display:block;margin-top:5px}.audit-period-actions{margin-top:14px}.audit-pagination{display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:16px;border-top:1px solid #dce6ed}@media(max-width:1100px){.audit-filter-row{align-items:flex-start;flex-direction:column}.audit-date-controls{width:100%;max-width:none}.audit-date-controls .audit-date-form{justify-content:flex-end}}@media(max-width:600px){.audit-date-controls{text-align:left}.audit-range-label,.audit-date-controls .audit-date-form{justify-content:flex-start}.audit-date-form .field{min-width:140px;flex:1}.audit-pagination{justify-content:space-between}}
+.audit-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.audit-period-summary {
+  min-width: 210px;
+}
+.audit-date-controls {
+  margin-left: auto;
+  text-align: right;
+  max-width: 760px;
+}
+.audit-date-controls .audit-date-form {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.audit-range-label {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 10px;
+}
+.audit-range-label span {
+  font-size: 12px;
+  color: #61798a;
+}
+.audit-range-label strong {
+  font-size: 19px;
+  color: #003856;
+}
+.audit-available {
+  display: block;
+  margin-top: 5px;
+}
+.audit-period-actions {
+  margin-top: 14px;
+}
+.audit-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-top: 1px solid #dce6ed;
+}
+@media (max-width: 1100px) {
+  .audit-filter-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .audit-date-controls {
+    width: 100%;
+    max-width: none;
+  }
+  .audit-date-controls .audit-date-form {
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 600px) {
+  .audit-date-controls {
+    text-align: left;
+  }
+  .audit-range-label,
+  .audit-date-controls .audit-date-form {
+    justify-content: flex-start;
+  }
+  .audit-date-form .field {
+    min-width: 140px;
+    flex: 1;
+  }
+  .audit-pagination {
+    justify-content: space-between;
+  }
+}
 /* Auditoria: faixa compacta conforme a referência, sem cartões explicativos extras. */
-.audit-date-panel{margin:0 0 12px!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;position:relative;z-index:15}
-.audit-date-panel .audit-filter-row{padding:16px 18px!important;gap:18px;align-items:center;flex-direction:row}
-.audit-date-panel .audit-period-summary{flex:1;min-width:200px}
-.audit-date-panel h2{font-size:17px!important;margin:0 0 6px!important}
-.audit-date-panel .subtitle{font-size:12px;margin:0!important;max-height:none;overflow:visible}
-.audit-date-controls{flex:0 0 auto;max-width:none}
-.audit-date-controls .audit-date-form{margin:0!important;gap:8px;flex-wrap:nowrap;align-items:end}
-.audit-date-form .audit-calendar-field{position:relative;min-width:0;width:146px;flex:none;text-align:left}
-.audit-calendar-field label{font-size:10px!important;margin-bottom:5px!important;display:block}
-.audit-date-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;height:38px;padding:8px 10px;border:1px solid #7c8991;border-radius:6px;background:white;color:#003856;font:inherit;font-size:12px;cursor:pointer}
-.audit-date-trigger svg{width:14px;height:14px;flex-shrink:0}.audit-date-trigger:focus-visible{outline:2px solid #007eff;outline-offset:2px}
-.audit-date-form>.btn{height:36px!important;min-height:36px!important;padding:8px 11px!important;font-size:11px!important;white-space:nowrap}
-.audit-calendar-host{position:absolute;right:0;top:100%;z-index:500}
-.audit-calendar{width:280px;margin-top:7px;padding:12px;border:1px solid #d8e2e8;border-radius:10px;background:#fff;box-shadow:0 10px 28px #002f4726;color:#111;text-align:center}
-.audit-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
-.audit-calendar-head strong{font-size:13px;text-transform:capitalize}.audit-calendar-head button{border:0;background:#f0f5f8;border-radius:5px;width:28px;height:28px;font-size:23px;cursor:pointer;color:#111}
-.audit-calendar-week,.audit-calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.audit-calendar-week{font-size:11px;color:#75828c;margin-bottom:5px}.audit-calendar-days button{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:5px;background:white;color:#111!important;font-size:12px;font-weight:600;cursor:pointer}
-.audit-calendar-days button:disabled{color:#cbd0d5!important;opacity:.65;background:#fff;cursor:default;font-weight:400}.audit-calendar-head button:disabled{color:#cbd0d5;cursor:default}.audit-calendar-days button:not(:disabled):hover,.audit-calendar-days button.is-selected{background:#dbeeff;outline:1px solid #007eff;color:#111!important}.audit-calendar-close{margin-top:8px;border:0;background:transparent;color:#003856;font:inherit;font-size:12px;cursor:pointer}
-.audit-period-actions{margin-top:8px;gap:14px}.audit-period-actions .textbtn{font-size:11px}
+.audit-date-panel {
+  margin: 0 0 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  position: relative;
+  z-index: 15;
+}
+.audit-date-panel .audit-filter-row {
+  padding: 16px 18px !important;
+  gap: 18px;
+  align-items: center;
+  flex-direction: row;
+}
+.audit-date-panel .audit-period-summary {
+  flex: 1;
+  min-width: 200px;
+}
+.audit-date-panel h2 {
+  font-size: 17px !important;
+  margin: 0 0 6px !important;
+}
+.audit-date-panel .subtitle {
+  font-size: 12px;
+  margin: 0 !important;
+  max-height: none;
+  overflow: visible;
+}
+.audit-date-controls {
+  flex: 0 0 auto;
+  max-width: none;
+}
+.audit-date-controls .audit-date-form {
+  margin: 0 !important;
+  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: end;
+}
+.audit-date-form .audit-calendar-field {
+  position: relative;
+  min-width: 0;
+  width: 146px;
+  flex: none;
+  text-align: left;
+}
+.audit-calendar-field label {
+  font-size: 10px !important;
+  margin-bottom: 5px !important;
+  display: block;
+}
+.audit-date-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #7c8991;
+  border-radius: 6px;
+  background: white;
+  color: #003856;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.audit-date-trigger svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.audit-date-trigger:focus-visible {
+  outline: 2px solid #007eff;
+  outline-offset: 2px;
+}
+.audit-date-form > .btn {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 8px 11px !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+.audit-calendar-host {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 500;
+}
+.audit-calendar {
+  width: 280px;
+  margin-top: 7px;
+  padding: 12px;
+  border: 1px solid #d8e2e8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 28px #002f4726;
+  color: #111;
+  text-align: center;
+}
+.audit-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.audit-calendar-head strong {
+  font-size: 13px;
+  text-transform: capitalize;
+}
+.audit-calendar-head button {
+  border: 0;
+  background: #f0f5f8;
+  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  font-size: 23px;
+  cursor: pointer;
+  color: #111;
+}
+.audit-calendar-week,
+.audit-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.audit-calendar-week {
+  font-size: 11px;
+  color: #75828c;
+  margin-bottom: 5px;
+}
+.audit-calendar-days button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: white;
+  color: #111 !important;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.audit-calendar-days button:disabled {
+  color: #cbd0d5 !important;
+  opacity: 0.65;
+  background: #fff;
+  cursor: default;
+  font-weight: 400;
+}
+.audit-calendar-head button:disabled {
+  color: #cbd0d5;
+  cursor: default;
+}
+.audit-calendar-days button:not(:disabled):hover,
+.audit-calendar-days button.is-selected {
+  background: #dbeeff;
+  outline: 1px solid #007eff;
+  color: #111 !important;
+}
+.audit-calendar-close {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: #003856;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.audit-period-actions {
+  margin-top: 8px;
+  gap: 14px;
+}
+.audit-period-actions .textbtn {
+  font-size: 11px;
+}
 /* Os controles ficam em sua própria área e o título não empurra ações para fora da linha. */
-.fullscreen-detail-page .fullscreen-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:20px!important;padding:14px 32px!important;box-sizing:border-box;min-width:0}
-.fullscreen-detail-page .fullscreen-header>div:first-child{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;min-width:0!important;gap:18px!important;align-items:center!important}
-.fullscreen-detail-page .fullscreen-header>div:first-child>div{min-width:0!important;overflow:hidden}
-.fullscreen-detail-page .fullscreen-header .eyebrow{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
-.fullscreen-detail-page .fullscreen-header h1{display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden!important;overflow-wrap:anywhere!important;margin:3px 0 0!important;font-size:18px!important;line-height:1.4!important;color:#0f172a;font-weight:700;min-width:0}
-.fullscreen-detail-page .fullscreen-header>.actions{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-end!important;gap:8px!important;min-width:0}
-.fullscreen-detail-page .fullscreen-header button{white-space:nowrap;flex-shrink:0}.fullscreen-detail-page .fullscreen-header>.actions .btn{font-size:12px;padding:10px 12px}
-@media(max-width:1100px){.audit-date-panel .audit-filter-row{flex-wrap:wrap}.audit-date-controls{margin-left:auto}.fullscreen-detail-page .fullscreen-header{gap:12px!important;padding:12px 20px!important}.fullscreen-detail-page .fullscreen-header>div:first-child{grid-template-columns:minmax(0,1fr)!important;gap:8px!important}.fullscreen-detail-page .fullscreen-header>div:first-child>.btn{justify-self:start}.fullscreen-detail-page .fullscreen-header h1{font-size:17px!important}}
-@media(max-width:700px){.audit-date-controls{width:100%}.audit-date-controls .audit-date-form{flex-wrap:wrap;justify-content:flex-start}.audit-date-form .audit-calendar-field{width:calc(50% - 4px)}.audit-calendar{width:260px}.audit-calendar-days button{width:29px}.audit-calendar-field:first-child .audit-calendar-host{left:0;right:auto}.fullscreen-detail-page .fullscreen-header{grid-template-columns:minmax(0,1fr)!important}.fullscreen-detail-page .fullscreen-header>.actions{justify-content:flex-start!important;flex-wrap:wrap!important}.fullscreen-detail-page .fullscreen-header>div:first-child{grid-template-columns:auto minmax(0,1fr)!important}}
-.fullscreen-detail-page .fullscreen-header{height:auto!important;min-height:88px!important;max-height:none!important}
-.fullscreen-detail-page .fullscreen-header h1{-webkit-line-clamp:2!important;max-height:2.8em!important}
+.fullscreen-detail-page .fullscreen-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 20px !important;
+  padding: 14px 32px !important;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.fullscreen-detail-page .fullscreen-header > div:first-child {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  min-width: 0 !important;
+  gap: 18px !important;
+  align-items: center !important;
+}
+.fullscreen-detail-page .fullscreen-header > div:first-child > div {
+  min-width: 0 !important;
+  overflow: hidden;
+}
+.fullscreen-detail-page .fullscreen-header .eyebrow {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+}
+.fullscreen-detail-page .fullscreen-header h1 {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden !important;
+  overflow-wrap: anywhere !important;
+  margin: 3px 0 0 !important;
+  font-size: 18px !important;
+  line-height: 1.4 !important;
+  color: #0f172a;
+  font-weight: 700;
+  min-width: 0;
+}
+.fullscreen-detail-page .fullscreen-header > .actions {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  min-width: 0;
+}
+.fullscreen-detail-page .fullscreen-header button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.fullscreen-detail-page .fullscreen-header > .actions .btn {
+  font-size: 12px;
+  padding: 10px 12px;
+}
+@media (max-width: 1100px) {
+  .audit-date-panel .audit-filter-row {
+    flex-wrap: wrap;
+  }
+  .audit-date-controls {
+    margin-left: auto;
+  }
+  .fullscreen-detail-page .fullscreen-header {
+    gap: 12px !important;
+    padding: 12px 20px !important;
+  }
+  .fullscreen-detail-page .fullscreen-header > div:first-child {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+  .fullscreen-detail-page .fullscreen-header > div:first-child > .btn {
+    justify-self: start;
+  }
+  .fullscreen-detail-page .fullscreen-header h1 {
+    font-size: 17px !important;
+  }
+}
+@media (max-width: 700px) {
+  .audit-date-controls {
+    width: 100%;
+  }
+  .audit-date-controls .audit-date-form {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .audit-date-form .audit-calendar-field {
+    width: calc(50% - 4px);
+  }
+  .audit-calendar {
+    width: 260px;
+  }
+  .audit-calendar-days button {
+    width: 29px;
+  }
+  .audit-calendar-field:first-child .audit-calendar-host {
+    left: 0;
+    right: auto;
+  }
+  .fullscreen-detail-page .fullscreen-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .fullscreen-detail-page .fullscreen-header > .actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .fullscreen-detail-page .fullscreen-header > div:first-child {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+}
+.fullscreen-detail-page .fullscreen-header {
+  height: auto !important;
+  min-height: 88px !important;
+  max-height: none !important;
+}
+.fullscreen-detail-page .fullscreen-header h1 {
+  -webkit-line-clamp: 2 !important;
+  max-height: 2.8em !important;
+}

@@ -1332,6 +1332,7 @@ let secapEditSession = {
   // Mapa por rid: { rid, obraNome, changes: Map<fieldId, { fieldId, fieldName, beforeRaw, afterRaw, before, after }>, saved: boolean }
   records: new Map(),
   justifications: new Map(),
+  reviewMarks: new Map(),
 };
 
 function resetSecapEditSession() {
@@ -1344,6 +1345,8 @@ function resetSecapEditSession() {
     records: new Map(),
     // Justificativas já digitadas na revisão (preservadas ao voltar para editar uma obra).
     justifications: new Map(),
+    // Marcação feita pelo usuário em cada obra: 'alterada' | 'sem_alteracao'.
+    reviewMarks: new Map(),
   };
 }
 
@@ -1527,7 +1530,9 @@ function hasAnyPendingSessionChanges() {
 
       // Ao clicar em "Salvar alterações", solicita a justificativa imediatamente,
       // antes de deixar o usuário voltar à listagem e continuar pelas demais obras.
-      if (isSessionSave && diffs.length > 0 && hasAnyPendingSessionChanges()) {
+      // Vale também quando o usuário voltou à edição pela revisão e salvou sem mudar
+      // nada na obra aberta: as alterações da sessão ainda aguardam a justificativa.
+      if (isSessionSave && hasAnyPendingSessionChanges()) {
         openExitAuditChecklistModal(() => {
           if (typeof render === 'function') render();
         });
@@ -1540,8 +1545,9 @@ function hasAnyPendingSessionChanges() {
 })();
 
 // Revisão das obras ao concluir a edição: lista todas as obras do projeto que o
-// usuário recebeu, marcadas como "Alteração feita" (editadas nesta sessão, marcação
-// automática) ou "Sem alteração", cada uma com justificativa opcional.
+// usuário recebeu. O próprio usuário marca cada uma como "Alteração feita" ou
+// "Sem alteração" (nada vem marcado); a justificativa opcional aparece após marcar.
+// Concluir só é permitido com todas as obras marcadas.
 function buildObraReviewList(pid, modifiedRecords) {
   const p = (typeof visible === 'function' ? visible() : db.projects).find(
     (project) => String(project.id) === String(pid)
@@ -1573,29 +1579,80 @@ function buildObraReviewList(pid, modifiedRecords) {
 
 function obraReviewLegendHtml() {
   return `<div class="obra-review-legend" aria-label="Legenda da revisão das obras">
-    <span class="orl-item is-changed"><i aria-hidden="true">✓</i><span><strong>Alteração feita</strong> · obra editada nesta sessão</span></span>
-    <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · obra mantida sem mudanças</span></span>
-    <span class="orl-item is-note">${icon('note')}<span><strong>Justificativa</strong> · opcional, por obra</span></span>
+    <span class="orl-item is-changed"><i aria-hidden="true">✓</i><span><strong>Alteração feita</strong> · marque nas obras que você alterou</span></span>
+    <span class="orl-item is-unchanged"><i aria-hidden="true">✓</i><span><strong>Sem alteração</strong> · marque nas obras que ficaram iguais</span></span>
+    <span class="orl-item is-note">${icon('note')}<span><strong>Justificativa</strong> · opcional, aparece após marcar</span></span>
   </div>`;
 }
 
-function obraReviewCheck(label, on, kind) {
-  return `<span class="orr-check ${kind} ${on ? 'is-on' : ''}" role="checkbox" aria-checked="${on}" aria-readonly="true" title="Marcado automaticamente pelo sistema">
+function obraReviewMark(rid) {
+  return secapEditSession.reviewMarks?.get(String(rid)) || '';
+}
+
+function obraReviewCheck(label, value, item, kind) {
+  const on = obraReviewMark(item.rid) === value;
+  return `<button type="button" class="orr-check ${kind} ${on ? 'is-on' : ''}" role="radio" aria-checked="${on}" data-rid="${esc(item.rid)}" data-value="${value}" onclick="setObraReviewMark(this)">
     <i aria-hidden="true">${on ? '✓' : ''}</i>${label}
-  </span>`;
+  </button>`;
+}
+
+// Marca a obra (clique do usuário) e libera a justificativa opcional.
+function setObraReviewMark(button) {
+  applyObraReviewMark(button.closest('.obra-review-row'), button.dataset.value);
+  updateObraReviewProgress();
+}
+
+// Marca de uma vez todas as obras visíveis (respeita a busca) com a mesma situação.
+function markAllObraReview(value) {
+  document
+    .querySelectorAll('#exitAuditForm .obra-review-row:not([hidden])')
+    .forEach((row) => applyObraReviewMark(row, value));
+  updateObraReviewProgress();
+}
+
+function applyObraReviewMark(row, value) {
+  if (!row) return;
+  if (!secapEditSession.reviewMarks) secapEditSession.reviewMarks = new Map();
+  secapEditSession.reviewMarks.set(String(row.dataset.rid), value);
+  row.querySelectorAll('.orr-check').forEach((el) => {
+    const on = el.dataset.value === value;
+    el.classList.toggle('is-on', on);
+    el.setAttribute('aria-checked', String(on));
+    el.querySelector('i').textContent = on ? '✓' : '';
+  });
+  row.classList.remove('needs-mark');
+  row.classList.toggle('is-marked-changed', value === 'alterada');
+  row.classList.toggle('is-marked-unchanged', value === 'sem_alteracao');
+  row.querySelector('.orr-just').hidden = false;
+}
+
+function updateObraReviewProgress() {
+  const rows = [...document.querySelectorAll('#exitAuditForm .obra-review-row')];
+  const marked = rows.filter((row) => obraReviewMark(row.dataset.rid)).length;
+  const progress = document.getElementById('obraReviewProgress');
+  if (progress) progress.textContent = `${marked} de ${rows.length} obra(s) marcada(s)`;
+  const warning = document.getElementById('obraReviewWarning');
+  if (warning && marked === rows.length) warning.hidden = true;
 }
 
 function obraReviewRowHtml(item) {
   const changed = item.status === 'alterada';
   const rid = esc(item.rid);
   const draft = secapEditSession.justifications?.get(String(item.rid)) || '';
+  const mark = obraReviewMark(item.rid);
+  const markClass =
+    mark === 'alterada'
+      ? 'is-marked-changed'
+      : mark === 'sem_alteracao'
+        ? 'is-marked-unchanged'
+        : '';
   return `
-    <div class="obra-review-row ${changed ? 'is-changed' : 'is-unchanged'}" data-review-name="${esc(item.obraNome.toLowerCase())}">
+    <div class="obra-review-row ${changed ? 'is-changed' : 'is-unchanged'} ${markClass}" data-rid="${rid}" data-review-name="${esc(item.obraNome.toLowerCase())}">
       <div class="orr-top">
         <strong class="orr-name">${esc(item.obraNome)}</strong>
-        <div class="orr-checks" role="group" aria-label="Situação da obra ${esc(item.obraNome)}">
-          ${obraReviewCheck('Alteração feita', changed, 'is-changed')}
-          ${obraReviewCheck('Sem alteração', !changed, 'is-unchanged')}
+        <div class="orr-checks" role="radiogroup" aria-label="Situação da obra ${esc(item.obraNome)}" aria-required="true">
+          ${obraReviewCheck('Alteração feita', 'alterada', item, 'is-changed')}
+          ${obraReviewCheck('Sem alteração', 'sem_alteracao', item, 'is-unchanged')}
           <button type="button" class="btn secondary small orr-edit" data-rid="${rid}" onclick="editObraFromReview(this.dataset.rid)" title="Voltar à edição desta obra">${icon('edit')} Editar</button>
         </div>
       </div>
@@ -1609,7 +1666,7 @@ function obraReviewRowHtml(item) {
               .join('')}</ul>`
           : ''
       }
-      <div class="orr-just">
+      <div class="orr-just" ${mark ? '' : 'hidden'}>
         <button type="button" class="textbtn orr-add" onclick="openObraJustification(this)" ${draft ? 'hidden' : ''}>${icon('plus')} Adicionar justificativa</button>
         <textarea data-rid="${rid}" rows="2" maxlength="600" ${draft ? '' : 'hidden'} aria-label="Justificativa da obra ${esc(item.obraNome)}" placeholder="Contexto, reunião, ofício ou motivo (opcional)">${esc(draft)}</textarea>
       </div>
@@ -1625,7 +1682,9 @@ function openObraJustification(button) {
 }
 
 function filterObraReview(text) {
-  const term = String(text || '').trim().toLowerCase();
+  const term = String(text || '')
+    .trim()
+    .toLowerCase();
   document.querySelectorAll('#exitAuditForm .obra-review-row').forEach((row) => {
     row.hidden = !!term && !row.dataset.reviewName.includes(term);
   });
@@ -1664,20 +1723,28 @@ function openExitAuditChecklistModal(onCompleteExit) {
        <div class="summary-strip" style="margin-bottom: 12px; padding: 10px 14px;">
          ${icon('shield')}
          <p style="font-size: 12.5px;">
-           <strong>${changed.length} obra(s) com alteração (${totalFieldsChanged} campo(s)) e ${unchanged.length} sem alteração.</strong><br>
-           Ao concluir, as alterações são salvas e a revisão de todas as obras é registrada na auditoria. A justificativa é opcional.
+           <strong>Marque em cada obra se houve alteração ou não.</strong> Nada vem marcado: a marcação é sua e fica registrada na auditoria.${isSysAdmin() ? ' Para administradores a marcação é opcional.' : ''}<br>
+           Nesta sessão, ${changed.length} obra(s) foram editadas (${totalFieldsChanged} campo(s)). Depois de marcar, você pode adicionar uma justificativa (opcional).
          </p>
        </div>
        ${obraReviewLegendHtml()}
-       <form id="exitAuditForm" onsubmit="event.preventDefault(); submitExitAuditChecklist();">
+       <form id="exitAuditForm" onsubmit="event.preventDefault(); submitExitAuditChecklist();" novalidate>
+         <div class="obra-review-warning" id="obraReviewWarning" role="alert" hidden></div>
+         <div class="obra-review-bulk">
+           <p class="obra-review-progress" id="obraReviewProgress" aria-live="polite">${review.filter((item) => obraReviewMark(item.rid)).length} de ${review.length} obra(s) marcada(s)</p>
+           <div class="obra-review-bulk-actions" role="group" aria-label="Marcar todas as obras">
+             <button type="button" class="orr-bulk is-unchanged" onclick="markAllObraReview('sem_alteracao')" title="Marca todas as obras listadas como Sem alteração">Marcar todas: Sem alteração</button>
+             <button type="button" class="orr-bulk is-changed" onclick="markAllObraReview('alterada')" title="Marca todas as obras listadas como Alteração feita">Marcar todas: Alteração feita</button>
+           </div>
+         </div>
          ${
            review.length > 6
              ? `<input type="search" class="obra-review-search" placeholder="Buscar obra pelo nome" aria-label="Buscar obra pelo nome" oninput="filterObraReview(this.value)">`
              : ''
          }
          <div class="obra-review-list">
-           ${group('Alteração feita', 'is-changed', changed, 'Nenhuma obra encontrada.')}
-           ${group('Sem alteração', 'is-unchanged', unchanged, unchanged.length ? 'Nenhuma obra encontrada.' : 'Todas as suas obras foram alteradas.')}
+           ${group('Editadas nesta sessão', 'is-changed', changed, 'Nenhuma obra encontrada.')}
+           ${group('Demais obras', 'is-unchanged', unchanged, unchanged.length ? 'Nenhuma obra encontrada.' : 'Todas as suas obras foram editadas.')}
          </div>
        </form>
      </div>`,
@@ -1764,6 +1831,79 @@ async function saveStagedObrasToBackend(p, modifiedRecords) {
   return { saved, failed };
 }
 
+// Confirmação visual para administradores que desejam sair sem marcar todos os checks.
+function showAdminUnmarkedExitDialog(unmarkedCount, totalCount) {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('adminUnmarkedExitDialog');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'adminUnmarkedExitDialog';
+    overlay.className = 'admin-exit-confirm-overlay';
+    overlay.innerHTML = `
+      <section class="admin-exit-confirm" role="dialog" aria-modal="true"
+        aria-labelledby="adminExitConfirmTitle" aria-describedby="adminExitConfirmText">
+        <button type="button" class="admin-exit-confirm-close" aria-label="Fechar">×</button>
+        <div class="admin-exit-confirm-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 3.5 2.9 19.2a1.5 1.5 0 0 0 1.3 2.3h15.6a1.5 1.5 0 0 0 1.3-2.3L12 3.5Z"
+              stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="12" cy="17.2" r="1" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="admin-exit-confirm-eyebrow">REVISÃO DE OBRAS</span>
+        <h2 id="adminExitConfirmTitle">Pendências na revisão</h2>
+        <p id="adminExitConfirmText">
+          Existem obras que ainda não tiveram seus checks preenchidos.
+          Deseja realmente sair sem concluir todas as marcações?
+        </p>
+        <div class="admin-exit-confirm-counter">
+          <div>
+            <strong>${unmarkedCount}</strong>
+            <span>obra(s) sem marcação</span>
+          </div>
+          <span class="admin-exit-confirm-total">de ${totalCount}</span>
+        </div>
+        <div class="admin-exit-confirm-actions">
+          <button type="button" class="admin-exit-confirm-back">Voltar e revisar</button>
+          <button type="button" class="admin-exit-confirm-leave">Sair sem marcar</button>
+        </div>
+        <small>Você poderá revisar essas informações posteriormente.</small>
+      </section>
+    `;
+
+    const finish = (confirmed) => {
+      overlay.classList.remove('is-visible');
+      document.removeEventListener('keydown', onKeyDown);
+      window.setTimeout(() => overlay.remove(), 160);
+      resolve(confirmed);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') finish(false);
+    };
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) finish(false);
+    });
+    overlay
+      .querySelector('.admin-exit-confirm-close')
+      .addEventListener('click', () => finish(false));
+    overlay
+      .querySelector('.admin-exit-confirm-back')
+      .addEventListener('click', () => finish(false));
+    overlay
+      .querySelector('.admin-exit-confirm-leave')
+      .addEventListener('click', () => finish(true));
+    document.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      overlay.classList.add('is-visible');
+      overlay.querySelector('.admin-exit-confirm-back')?.focus();
+    });
+  });
+}
+
 let exitAuditSubmitting = false;
 async function submitExitAuditChecklist() {
   const form = document.getElementById('exitAuditForm');
@@ -1771,22 +1911,63 @@ async function submitExitAuditChecklist() {
 
   const justificationOf = (rid) =>
     String(
-      [...form.querySelectorAll('textarea[data-rid]')].find((box) => box.dataset.rid === String(rid))
-        ?.value || ''
+      [...form.querySelectorAll('textarea[data-rid]')].find(
+        (box) => box.dataset.rid === String(rid)
+      )?.value || ''
     ).trim();
 
   const { pid } = secapEditSession;
   const p = db.projects.find((project) => String(project.id) === String(pid));
   const modifiedRecords = getAllSessionModifiedRecords();
 
-  const review = buildObraReviewList(pid, modifiedRecords).map((item) => {
-    const entry = { recordId: item.rid, recordName: item.obraNome, status: item.status };
+  // Todas as obras precisam ser marcadas pelo usuário antes de concluir.
+  const reviewList = buildObraReviewList(pid, modifiedRecords);
+  const unmarked = reviewList.filter((item) => !obraReviewMark(item.rid));
+  // Administradores não são obrigados a marcar: apenas confirmam a saída sem marcar.
+  if (unmarked.length && isSysAdmin()) {
+    const total = reviewList.length;
+    const confirmed = await showAdminUnmarkedExitDialog(unmarked.length, total);
+    if (!confirmed) return;
+  } else if (unmarked.length) {
+    const search = form.querySelector('.obra-review-search');
+    if (search && search.value) {
+      search.value = '';
+      filterObraReview('');
+    }
+    const pendingIds = new Set(unmarked.map((item) => String(item.rid)));
+    form
+      .querySelectorAll('.obra-review-row')
+      .forEach((row) => row.classList.toggle('needs-mark', pendingIds.has(row.dataset.rid)));
+    const warning = document.getElementById('obraReviewWarning');
+    const message = `Marque “Alteração feita” ou “Sem alteração” em todas as obras antes de concluir. Falta(m) ${unmarked.length} obra(s).`;
+    if (warning) {
+      warning.textContent = message;
+      warning.hidden = false;
+    }
+    notify(message, 'error');
+    const first = form.querySelector('.obra-review-row.needs-mark');
+    if (first) {
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      first.querySelector('.orr-check')?.focus({ preventScroll: true });
+    }
+    return;
+  }
+
+  const review = reviewList.map((item) => {
+    // Situação declarada pelo usuário; a detecção do sistema fica registrada à parte.
+    const entry = {
+      recordId: item.rid,
+      recordName: item.obraNome,
+      status: obraReviewMark(item.rid) || 'sem_marcacao',
+      detectedStatus: item.status,
+    };
     const justification = justificationOf(item.rid);
     if (justification) entry.justification = justification;
     return entry;
   });
   const changedCount = review.filter((item) => item.status === 'alterada').length;
-  const unchangedCount = review.length - changedCount;
+  const unchangedCount = review.filter((item) => item.status === 'sem_alteracao').length;
+  const unmarkedCount = review.length - changedCount - unchangedCount;
 
   // Salva no banco TODAS as obras modificadas que ainda não haviam sido salvas.
   const submitButton = document.querySelector('#modal button[form="exitAuditForm"]');
@@ -1828,7 +2009,7 @@ async function submitExitAuditChecklist() {
 
   if (p && typeof persist === 'function') {
     persist(
-      `Edição em lote de obras (${changedCount} com alteração · ${unchangedCount} sem alteração)`,
+      `Edição em lote de obras (${changedCount} com alteração · ${unchangedCount} sem alteração${unmarkedCount ? ` · ${unmarkedCount} sem marcação` : ''})`,
       p,
       '',
       '',
@@ -1839,6 +2020,7 @@ async function submitExitAuditChecklist() {
         checklist: [
           `Alteração feita: ${changedCount} obra(s)`,
           `Sem alteração: ${unchangedCount} obra(s)`,
+          ...(unmarkedCount ? [`Sem marcação: ${unmarkedCount} obra(s)`] : []),
         ],
         review,
         changes: modifiedRecords.flatMap((item) =>
@@ -2942,7 +3124,8 @@ editFields = function (pid, focusSection = '') {
 function createProjectSectionPrompt(pid) {
   const p = personalProjectLayout(pid);
   if (!p) return;
-  if (!p.fields.length) return notify('Este projeto ainda não possui campos para organizar.', 'error');
+  if (!p.fields.length)
+    return notify('Este projeto ainda não possui campos para organizar.', 'error');
 
   modal(
     'Nova seção',

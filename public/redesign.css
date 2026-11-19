@@ -3109,3 +3109,29 @@ details.record-group summary span {
   margin: 0;
   line-height: 1.6;
 }
+
+.access-notice {
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  border: 1px solid #f3c98b;
+  border-left: 4px solid #f36e22;
+  border-radius: 10px;
+  background: #fff6ea;
+  color: #4a3515;
+}
+.access-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 1rem;
+}
+.access-notice p {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+.access-notice.is-refused {
+  border-color: #efb4b4;
+  border-left-color: #c0392b;
+  background: #fdeeee;
+  color: #5a1d1d;
+}
