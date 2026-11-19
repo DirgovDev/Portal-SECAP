@@ -141,6 +141,11 @@ end $$;
 revoke all on function public.secap_weekly_notify_record(date, uuid, text, text, jsonb, text, text, text) from public, anon, authenticated;
 grant execute on function public.secap_weekly_notify_record(date, uuid, text, text, jsonb, text, text, text) to service_role;
 
+-- O servidor confere se quem pediu o envio é administrador (tabela profiles) usando a
+-- chave service_role. No Supabase em nuvem isso não vem liberado: concede só leitura.
+grant usage on schema public to service_role;
+grant select on public.profiles to service_role;
+
 notify pgrst, 'reload schema';
 commit;
 select 'Notificação semanal instalada com sucesso' as resultado;

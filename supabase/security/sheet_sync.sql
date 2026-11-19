@@ -96,6 +96,11 @@ end $$;
 revoke all on function public.secap_sheet_sync_apply(text,jsonb,jsonb,text) from public, anon, authenticated;
 grant execute on function public.secap_sheet_sync_apply(text,jsonb,jsonb,text) to service_role;
 
+-- O servidor lê o projeto e as obras pela API com a chave service_role. No Supabase em
+-- nuvem as tabelas novas não dão leitura a esse papel automaticamente: concede só leitura.
+grant usage on schema public to service_role;
+grant select on public.app_state, public.obras to service_role;
+
 notify pgrst,'reload schema';
 commit;
 select 'Sincronia com a planilha Google preparada com sucesso' as resultado;
