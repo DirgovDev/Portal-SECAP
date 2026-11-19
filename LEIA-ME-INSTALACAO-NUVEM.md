@@ -62,6 +62,16 @@ No Supabase em nuvem, tabelas novas **não** dão leitura/gravação automática
 3. No servidor do portal: em `data/sheet-sync.json` e `data/weekly-notify.json`, troque `supabase_url` e `service_role_key` pelos do projeto em nuvem.
 4. Os **dados** (obras, projeto, usuários) não são copiados por estes scripts. Usuários precisam se cadastrar de novo na nuvem; as obras podem ser importadas pela planilha ou migradas à parte.
 
+## Instalação feita (19/11/2026)
+
+Projeto **DirgovDev's Project** (`https://yawnjpffwulxhykmigfn.supabase.co`), aplicado pela ferramenta de migrações do Supabase (histórico em *Database → Migrations*):
+
+- Arquivos 1–18, 21, 22 e 27–32 aplicados na ordem acima.
+- 19, 20 e 23–26 não foram reenviados: o conteúdo deles está 100% contido nos arquivos 18 e 22 (verificado linha a linha), então não mudariam nada.
+- Conferência: funções (64), colunas (93), índices (33), RLS (14 tabelas) e gatilhos (10) idênticos ao banco de teste aprovado; as 20 políticas RLS idênticas às do banco local em uso.
+- 23 testes de funcionamento executados na própria nuvem, dentro de uma transação desfeita ao final (nenhum dado ficou gravado): administrador, usuária vinculada pelo Responsável Acompanhamento, usuário sem vínculo, visitante sem login, chave de serviço, planilha, auditoria, notificação semanal e sino — todos aprovados.
+- Avisos do Security Advisor: apenas os esperados — 3 tabelas internas com RLS sem política (acesso só pelas funções do sistema), `admin_exists`/`email_is_admin` liberadas para a tela de entrada e as funções RPC do portal (cada uma confere administrador/membro internamente).
+
 ## Testes realizados (19/11/2026)
 
 Banco de teste réplica do projeto em nuvem (Postgres 17, regras de privilégio e de RLS automático iguais às do projeto), instalado do zero com a ordem acima:
