@@ -20,6 +20,5 @@
 /* Links externos do portal.
    Cole abaixo o link do Apps Script (implantação "App da Web", termina em /exec). Precisa ser https. */
 window.SECAP_LINKS = {
-  solicitacoes:
-    'https://script.google.com/macros/s/AKfycbxFdcjP8-jt7wXurYUHCEWtnbvEU_vC4tUMJ-f07aJVrQYJZ6Uz9S2QtXKCrUoIqf8I/exec',
+  solicitacoes: 'https://dirgovdev.github.io/secap-modernizacao/',
 };
