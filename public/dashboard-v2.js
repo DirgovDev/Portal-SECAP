@@ -114,7 +114,7 @@
       : 0;
     var attention = all
       .filter(function (i) {
-        return i.idle;
+        return needsAttention(i);
       })
       .sort(function (a, b) {
         return b.idleDays - a.idleDays || score(b) - score(a);
@@ -124,43 +124,10 @@
     };
 
     var kpis = [
-      [
-        'all',
-        'folder',
-        'Total de obras',
-        all.length,
-        projects.length + (projects.length === 1 ? ' projeto' : ' projetos'),
-        'navy',
-      ],
-      ['running', 'kanban', 'Em andamento', running, pct(running), 'cyan'],
-      ['done', 'check', 'Concluídas', done, pct(done), 'green'],
-      [
-        'stopped',
-        'alert',
-        'Paralisadas',
-        stopped,
-        stopped ? 'Exigem decisão' : 'Nenhuma no momento',
-        'red',
-      ],
-      ['late', 'calendar', 'Atrasadas', late, late?'Prazo vencido ou atraso informado':all.length?'Sem atraso identificado':'Sem obras cadastradas', 'orange'],
-      [
-        'attention',
-        'alert',
-        'Ponto de atenção',
-        cnt(function(i){return i.status==='Ponto de Atenção';}),
-        'Situação informada nos registros',
-        'orange',
-      ],
-      [
-        null,
-        'chart',
-        'Avanço físico médio',
-        !prog.length?'Sem medição':prog.length<active.length?'Dados parciais':avgProg+'%',
-        prog.length+' de '+active.length+' não canceladas com medição'+(prog.length?' · média informada: '+avgProg.toLocaleString('pt-BR')+'%':''),
-        'green',
-        prog.length===active.length&&prog.length?avgProg:undefined,
-      ],
-      [null,'clock','Informação mais recente',execRecentDate(rowsOf(projects))?date(execRecentDate(rowsOf(projects))):'Não informada','Conferir registros sem atualização','navy'],
+      ['all','folder','Total de obras',all.length,projects.length+(projects.length===1?' projeto':' projetos'),'navy'],
+      ['running','kanban','Em andamento',running,pct(running),'cyan'],
+      ['done','check','Concluídas',done,pct(done),'green'],
+      ['attention','alert','Precisam de atenção',attention.length,'Atrasos, paralisações e registros sem alteração','orange'],
     ];
     var kpiHtml = kpis
       .map(function (k) {
@@ -192,35 +159,15 @@
       })
       .join('');
 
-    var top = attention.slice(0, 8);
-    var attHtml = top.length
-      ? top
-          .map(function (i) {
-            return (
-              '<li class="att-row"><div class="att-main"><b>' +
-              esc(i.title) +
-              '</b><small>' +
-              esc(i.x.p.name || '') +
-              (i.agency ? ' · ' + esc(i.agency) : '') +
-              '</small><span class="att-tags">' +
-              [['stale',idleText(i.idleDays)]].concat(reasons(i).filter(function(t){return t[0]!=='stale'}))
-                .map(function (t) {
-                  return '<span class="att-tag ' + t[0] + '">' + esc(t[1]) + '</span>';
-                })
-                .join('') +
-              '</span><small class="att-next-action">Última alteração: '+esc(dateTime(i.lastEdit))+' · '+esc(i.x.r.proxima||'Definir a próxima providência')+'</small></div><button type="button" class="btn" onclick="editRecord(\'' +
-              esc(i.x.p.id) +
-              "','" +
-              esc(i.x.r.id) +
-              '\')">Abrir ' +
-              icon('arrow') +
-              '</button></li>'
-            );
-          })
-          .join('')
-      : '<li class="att-empty">' +
-        icon('check') +
-        (all.length?'<b>Nenhuma obra parada</b><small>Todas as obras em acompanhamento foram alteradas nos últimos '+IDLE_DAYS+' dias.</small></li>':'<b>Ainda não há obras</b><small>Cadastre ou importe os registros para iniciar a análise.</small></li>');
+    var top = attention.slice(0, 6);
+    var attHtml = top.length ? '<div class="balanced-table-scroll"><table class="balanced-attention-table"><thead><tr><th>Obra</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th><span class="sr-only">Abrir obra</span></th></tr></thead><tbody>'+top.map(function(i){
+      var owner=String(val(i.x.r,i.x.p,'owner')||'').trim();
+      var deadline=val(i.x.r,i.x.p,'deadline');
+      var tags=(i.idle?[['stale',idleText(i.idleDays)]]:[]).concat(reasons(i).filter(function(t){return t[0]!=='stale'}));
+      return '<tr><td><button class="balanced-obra-link" type="button" onclick="editRecord(\''+esc(i.x.p.id)+'\',\''+esc(i.x.r.id)+'\')">'+esc(i.title)+'</button><small>'+esc(i.x.p.name)+'</small>'+(i.x.r.proxima?'<small class="balanced-next-action">'+esc(i.x.r.proxima)+'</small>':'')+'</td><td>'+esc(owner||'Não informado')+'</td><td class="balanced-deadline">'+esc(deadline?date(deadline):'Sem prazo')+'</td><td><div class="att-tags">'+tags.map(function(t){return '<span class="att-tag '+t[0]+'">'+esc(t[1])+'</span>'}).join('')+'</div></td><td>'+openBtn(i.x.p.id,i.x.r.id)+'</td></tr>';
+    }).join('')+'</tbody></table></div>':'<div class="balanced-empty">'+icon('check')+'<b>'+(all.length?'Nenhuma obra exige atenção pelos critérios atuais':'Ainda não há obras cadastradas')+'</b><p>Atrasos, paralisações, pontos de atenção e obras sem alteração há mais de '+IDLE_DAYS+' dias aparecem aqui.</p></div>';
+    var upcoming=upcomingWorks(all);
+    var upcomingHtml=upcoming.length?'<ul class="balanced-deliveries">'+upcoming.slice(0,5).map(deliveryRow).join('')+'</ul>':'<div class="balanced-empty"><p>Nenhuma obra com prazo de entrega informado nos próximos 30 dias.</p></div>';
 
     setTimeout(function () {
       if(generation===renderGeneration&&tab==='dashboard'){drawCharts(projects,all);if(isSysAdmin())loadRecentEditors(generation);}
@@ -235,37 +182,25 @@
       head(
         'PORTAL SECAP · ' + d.toUpperCase(),
         'Visão geral',
-        attention.length
-          ? attention.length +
-              (attention.length === 1 ? ' obra está' : ' obras estão') +
-              ' sem alteração há mais de '+IDLE_DAYS+' dias.'
-          : all.length?'Todas as obras em acompanhamento foram alteradas nos últimos '+IDLE_DAYS+' dias.':'Cadastre projetos e obras para começar o acompanhamento.'
+        'Indicadores, obras que exigem atenção e próximas entregas em um só lugar.'
       ) +
       
-      '<section class="dkpis" aria-label="Indicadores">' +
-      kpiHtml +
-      '</section>' +
-      
-      '<div class="dgrid"><section class="panel"><div class="panelhead"><div><h2>Prazos e decisões pendentes</h2><small>' +
-      (attention.length > 8
-        ? 'As 8 paradas há mais tempo, de ' + attention.length + ' sem alteração há mais de ' + IDLE_DAYS + ' dias'
-        : 'Obras sem alteração há mais de ' + IDLE_DAYS + ' dias') +
-      '</small></div>' +
-      (attention.length
-        ? '<button class="textbtn" onclick="dashOpen(\'attention\')">Ver todas</button>'
-        : '') +
-      '</div>' +
-      '<ul class="att-list">' +
-      attHtml +
-      '</ul></section>' +
-      '<section class="panel"><div class="panelhead"><div><h2>Obras por situação</h2><small>Status informado nas obras</small></div></div>' +
-      '<div class="panelbody"><div id="dashStatus" class="dchart" style="height:300px"></div></div></section></div>' +
-      
+      '<div class="overview-balanced">'+
+      '<section class="dkpis balanced-kpis" aria-label="Resumo das obras">'+kpiHtml+'</section>'+
+      '<div class="balanced-main-grid"><section class="panel balanced-attention"><div class="panelhead"><div><h2>Obras que precisam de atenção</h2><small>'+attention.length+' obra(s) identificada(s) · exibindo até 6</small></div>'+(attention.length?'<button class="textbtn" onclick="dashOpen(\'attention\')">Ver todas '+icon('arrow')+'</button>':'')+'</div>'+attHtml+'</section>'+
+      '<section class="panel balanced-status"><div class="panelhead"><div><h2>Situação das obras</h2><small>Clique em uma barra para consultar as obras</small></div></div><div class="panelbody"><div id="dashStatus" class="dchart" style="height:340px"></div></div></section></div>'+
+      '<section class="panel balanced-upcoming"><div class="panelhead"><div><h2>'+icon('calendar')+' Próximas entregas</h2><small>Prazos de entrega informados para os próximos 30 dias</small></div>'+(upcoming.length?'<button class="textbtn" onclick="dashUpcoming()">Ver todas '+icon('arrow')+'</button>':'')+'</div>'+upcomingHtml+'</section></div>'+
       '<div class="dgrid" style="grid-template-columns:1fr">' +
       (isSysAdmin() ? recentEditorsPanel() : recentObrasPanel(all)) +
       '</div>'
     );
   };
+
+  function needsAttention(i){return !i.finished&&!i.cancelled&&(i.idle||i.late||i.paralyzed||i.attention);}
+  function upcomingWorks(all){return all.filter(function(i){var deadline=val(i.x.r,i.x.p,'deadline');var remaining=deadline?daysLeft(deadline):null;return !i.finished&&!i.cancelled&&remaining!==null&&remaining>=0&&remaining<=30;}).sort(function(a,b){return daysLeft(val(a.x.r,a.x.p,'deadline'))-daysLeft(val(b.x.r,b.x.p,'deadline'));});}
+  function deliveryRow(i){return '<li><div><button type="button" class="balanced-obra-link" onclick="editRecord(\''+esc(i.x.p.id)+'\',\''+esc(i.x.r.id)+'\')">'+esc(i.title)+'</button><small>'+esc(i.x.p.name)+' · '+esc(i.x.r.proxima||'Prazo de entrega da obra')+'</small></div><span class="balanced-delivery-date">'+icon('calendar')+esc(date(val(i.x.r,i.x.p,'deadline')))+'</span></li>';}
+  window.dashUpcoming=function(){var all=rowsOf(typeof visible==='function'?visible():db.projects||[]).map(info);var upcoming=upcomingWorks(all);modal('Próximas entregas · 30 dias','<ul class="balanced-deliveries">'+upcoming.map(deliveryRow).join('')+'</ul>','<button class="btn" onclick="closeModal()">Fechar</button>');};
+  window.dashStatusWorks=function(status){var list=rowsOf(typeof visible==='function'?visible():db.projects||[]).map(info).filter(function(i){return normalizarStatus(i.status)===status});modal('Obras · '+status,'<ul class="balanced-deliveries">'+list.map(function(i){return '<li><div><b>'+esc(i.title)+'</b><small>'+esc(i.x.p.name)+'</small></div>'+openBtn(i.x.p.id,i.x.r.id)+'</li>'}).join('')+'</ul>','<button class="btn" onclick="closeModal()">Fechar</button>');};
 
   function openBtn(pid,rid){return '<button type="button" class="btn" onclick="editRecord(\''+esc(pid)+"','"+esc(rid)+'\')">Abrir '+icon('arrow')+'</button>'}
 
@@ -392,65 +327,15 @@
   }
 
   function drawCharts(projects, all) {
-    var a = chartOn('dashStatus');
-    if (a) {
-      var m = {};
-      all.forEach(function (i) {
-        var st = normalizarStatus(i.status);
-        m[st] = (m[st] || 0) + 1;
-      });
-
-      var data = Object.keys(m).map(function (k) {
-        return {name:k,value:m[k],itemStyle:{color:statusColor(k)}};
-      });
-
-      var visibleStatusTotal=data.reduce(function(sum,item){return statusSelected[item.name]===false?sum:sum+item.value},0);
-      if (!data.length) empty(a.el, 'Ainda não há obras cadastradas.');
-      else {
-        a.el.style.height=Math.max(340,260+data.length*30)+'px';a.c.resize();
-        a.c.setOption(
-          {
-            color: ['#f37021', '#169dc4', '#002f47', '#194621', '#97b0bf', '#c93636', '#b4a0c6'],
-            graphic:{type:'text',left:'center',id:'visibleStatusTotal',top:102,silent:true,style:{text:visibleStatusTotal+'\n'+(visibleStatusTotal===1?'obra':'obras'),textAlign:'center',fill:'#002f47',fontSize:18,fontWeight:700,lineHeight:24}},
-            tooltip: { trigger: 'item', confine:true, formatter: '{b}: <b>{c} obras</b> ({d}%)' },
-            legend: {
-              type:'plain',
-              selected:{...statusSelected},
-              orient:'vertical',
-              left:16,
-              top:250,
-              itemGap:10,
-              itemWidth:16,itemHeight:16,
-              itemStyle:{borderColor:'#94A3B8',borderWidth:1},
-              formatter:function(name){return name+'  · '+m[name]+' '+(m[name]===1?'obra':'obras')},
-              icon: 'circle',
-              textStyle: { color: '#475569', fontSize:15,lineHeight:20 },
-            },
-            series: [
-              {
-                name: 'Situação',
-                type: 'pie',
-                radius:[67,100],
-                center:['50%',122], // Sobe o círculo para afastar da legenda
-                avoidLabelOverlap: true,
-                itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 6 },
-
-                label: {show:false},
-                emphasis: {label:{show:false}},
-                labelLine: { show: false },
-                data: data,
-              },
-            ],
-          },
-          true
-        );
-        // Legend toggles change only the visible chart total, never the source data.
-        a.c.off('legendselectchanged');
-        a.c.on('legendselectchanged',function(event){
-          statusSelected={...event.selected};
-          var visibleTotal=data.reduce(function(sum,item){return event.selected[item.name]===false?sum:sum+item.value},0);
-          a.c.setOption({graphic:{id:'visibleStatusTotal',style:{text:visibleTotal+'\n'+(visibleTotal===1?'obra':'obras')}}});
-        });
+    var a=chartOn('dashStatus');
+    if(a){
+      var counts={};all.forEach(function(i){var st=normalizarStatus(i.status);counts[st]=(counts[st]||0)+1;});
+      var names=Object.keys(counts).sort(function(x,y){return counts[y]-counts[x]||x.localeCompare(y,'pt-BR')});
+      if(!names.length)empty(a.el,'Ainda não há obras cadastradas.');
+      else{
+        a.el.style.height=Math.max(280,names.length*48+50)+'px';a.c.resize();
+        a.c.setOption({grid:{left:14,right:38,top:12,bottom:20,containLabel:true},tooltip:{trigger:'axis',axisPointer:{type:'shadow'},confine:true,valueFormatter:function(v){return v+(v===1?' obra':' obras')}},xAxis:{type:'value',minInterval:1,axisLabel:{color:'#667b89'},splitLine:{lineStyle:{color:'#edf2f5'}}},yAxis:{type:'category',inverse:true,data:names,axisTick:{show:false},axisLine:{show:false},axisLabel:{color:'#003249',fontSize:12,width:110,overflow:'break',lineHeight:17}},series:[{type:'bar',name:'Obras',barMaxWidth:22,label:{show:true,position:'right',color:'#003249',fontWeight:700},data:names.map(function(name){return {name:name,value:counts[name],itemStyle:{color:statusColor(name),borderColor:'#bbcbd5',borderWidth:1,borderRadius:[0,4,4,0]}};})}]},true);
+        a.c.off('click');a.c.on('click',function(event){if(event.name)dashStatusWorks(event.name);});
       }
     }
 
@@ -604,7 +489,7 @@
     var projects = (typeof visible==='function'?visible():db.projects||[]);
     var all = rowsOf(projects).map(info);
     var f = {
-      attention:[function(i){return i.idle},'Obras sem alteração há mais de '+IDLE_DAYS+' dias'],
+      attention:[needsAttention,'Obras que precisam de atenção'],
       all: [
         function () {
           return true;
