@@ -145,14 +145,7 @@ kanban = function () {
         (me()?.role === 'Administrador' ? btn('Novo quadro', 'editWorkflow()', 'plus') : '')
     ) +
     filters(typeof kanbanResponsibleFilter==='function'?kanbanResponsibleFilter():'') +
-    `<div class="workflow-tabs">${workflowSettings()
-      .boards.map(
-        (q) =>
-          `<button class="btn ${q.id === b.id ? 'primary' : ''}" data-id="${esc(q.id)}" onclick="setWorkflow(this.dataset.id)">${esc(q.name)}</button>`
-      )
-      .join(
-        ''
-      )}</div><div class="workflow-toolbar"><span>Arraste as obras entre etapas ou use a seleção no cartão. Mover entre etapas atualiza o status da obra no projeto. ${items.length} ${items.length === 1 ? 'obra' : 'obras'} neste quadro.</span>${me()?.role === 'Administrador' ? btn('Configurar quadro', `editWorkflow('${b.id}')`, 'edit') : ''}</div><div class="board trello-board calm-board">${b.stages
+    `${workflowSettings().boards.length>1?'<div class="workflow-switch"><label>Quadro <select aria-label="Selecionar quadro de acompanhamento" onchange="setWorkflow(this.value)">'+workflowSettings().boards.map(q=>'<option value="'+esc(q.id)+'" '+(q.id===b.id?'selected':'')+'>'+esc(q.id==='principal'?'Principal':q.name)+'</option>').join('')+'</select></label></div>':''}<div class="workflow-toolbar"><span>Arraste as obras entre etapas ou use a seleção no cartão. Mover entre etapas atualiza o status da obra no projeto. ${items.length} ${items.length === 1 ? 'obra' : 'obras'} neste quadro.</span>${me()?.role === 'Administrador' ? btn('Configurar quadro', `editWorkflow('${b.id}')`, 'edit') : ''}</div><div class="board trello-board calm-board">${b.stages
       .map((stage, i) => {
         const color = validHex(b.colors[stage]) ? b.colors[stage] : softDefaults[i % 4],
           col = items.filter(({ p, r }) => obraStage(r, p, b) === stage);
